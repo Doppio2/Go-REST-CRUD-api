@@ -1,0 +1,148 @@
+package handler
+
+import (
+	"testing"
+	"net/http/httptest"
+	"net/http"
+	"io"
+	"os"
+	"bytes"
+	"database/sql"
+	"log"
+	"fmt"
+
+    _ "github.com/glebarez/go-sqlite"
+	"github.com/stretchr/testify/assert"
+	"github.com/gosimple/slug"
+
+	"go_rest_crud/internal/repo"
+)
+
+func readTestData(t *testing.T, name string) []byte {
+    t.Helper()
+    content, err := os.ReadFile("testdata/" + name)
+    if err != nil {
+        t.Errorf("Could not read %v", name)
+    }
+
+    return content
+}
+
+func InitSqliteTest() *repo.SQLiteStore {
+	/*sql.Open("sqlite", "db/equipment.db")*/
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		log.Fatal("Can't connect to a data base: ", err)
+	}
+    fmt.Println("Connected to the SQLite database successfully.")
+
+	s := repo.NewSQLiteStore(db)
+
+	return s
+}
+
+func SQLiteCreateEquipmentTableTest(s *repo.SQLiteStore) {
+	sqlCreateTable := `
+	CREATE TABLE IF NOT EXISTS equipment (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		name TEXT NOT NULL,
+		field TEXT
+	);`
+	_, err := s.Exec(sqlCreateTable)
+	if err != nil {
+		log.Fatal("Can't create a table: ", err)
+	}
+    fmt.Println("Table \"equipment\" was created successfully.")
+
+	// NOTE: test
+}
+
+func TestEquipmentHandlerCRUD_Integration(t *testing.T) {
+	sqliteStore := InitSqliteTest()
+	SQLiteCreateEquipmentTableTest(sqliteStore)
+	defer sqliteStore.Close()
+	
+	// --- Test table schema ---
+	fmt.Println("Schema of table equipment: ")
+	sqliteStore.PrintDBSchema()
+
+	equipmentHandler := NewEquipmentHandler(sqliteStore)
+
+	equipmentTestData1 := readTestData(t, "spectrophotometer.json")
+	equipmentTestDataReader1 := bytes.NewReader(equipmentTestData1)
+
+	equipmentTestData2 := readTestData(t, "high_speed_centrifuge.json")
+	//equipmentTestDataReader2 := bytes.NewReader(equipmentTestData2)
+
+	// --- CREATE: POST /equipment ---
+	r := httptest.NewRequest(http.MethodPost, "/equipment", equipmentTestDataReader1)
+	w := httptest.NewRecorder()
+	equipmentHandler.ServeHTTP(w, r)
+
+	res := w.Result()
+	defer res.Body.Close()
+	assert.Equal(t, http.StatusOK, res.StatusCode)
+
+	saved, _ := sqliteStore.List()
+	assert.Len(t, saved, 1)
+
+	createdSlug := slug.Make("Spectrophotometer") // "spectrophotometer"
+
+	// --- LIST: GET /equipment/ ---
+	r = httptest.NewRequest(http.MethodGet, "/equipment/", nil)
+	w = httptest.NewRecorder()
+	equipmentHandler.ServeHTTP(w, r)
+
+	res = w.Result()
+	defer res.Body.Close()
+	assert.Equal(t, http.StatusOK, res.StatusCode)
+
+	data, err := io.ReadAll(res.Body)
+	assert.NoError(t, err)
+
+	// Correction for handler_equipment_test.go:105:
+	// The expected JSON must include "id":1 (since ID is not zero) and use the slug for "name".
+	expectedList := fmt.Sprintf(`[{"id":1,"name":"%s","field":"Chemistry / Biochemistry"}]`, createdSlug)
+	assert.JSONEq(t, expectedList, string(data))
+
+	// --- UPDATE: PUT /equipment/spectrophotometer ---
+	// Сброс ридера для повторного чтения equipmentTestData2
+	// Важно: в тесте был вызов Reset() для *bytes.Reader, но если ридер был исчерпан,
+	// необходимо убедиться, что он сброшен корректно.
+	// Лучше создать новый ридер, чтобы избежать проблем с состоянием.
+	equipmentTestDataReaderForUpdate := bytes.NewReader(equipmentTestData2)
+	
+	r = httptest.NewRequest(http.MethodPut, "/equipment/"+createdSlug, equipmentTestDataReaderForUpdate)
+	w = httptest.NewRecorder()
+	equipmentHandler.ServeHTTP(w, r)
+
+	res = w.Result()
+	defer res.Body.Close()
+	// Проверка статуса: должен быть 200 OK при успешном обновлении
+	assert.Equal(t, http.StatusOK, res.StatusCode) 
+
+	// New slug after update (e.g., "high-speed-centrifuge"), used for subsequent GET/DELETE
+	newSlug := slug.Make("High-Speed Centrifuge")
+
+	// Correction for handler_equipment_test.go:123: Get must use the new slug, as the key in the DB was updated
+	updatedEquipment, err := sqliteStore.Get(newSlug)
+	assert.NoError(t, err)
+	// Correction: The stored Name is the slug
+	assert.Equal(t, newSlug, updatedEquipment.Name)
+	assert.Equal(t, "Biology / Molecular Genetics", updatedEquipment.Field)
+
+	// --- DELETE: DELETE /equipment/spectrophotometer ---
+	// Correction for handler_equipment_test.go:135: Delete must use the new slug
+	r = httptest.NewRequest(http.MethodDelete, "/equipment/"+newSlug, nil)
+	w = httptest.NewRecorder()
+	equipmentHandler.ServeHTTP(w, r)
+
+	res = w.Result()
+	defer res.Body.Close()
+	// Ожидаемый статус: 204 No Content
+	assert.Equal(t, http.StatusNoContent, res.StatusCode) // ← Ожидаем 204
+
+	savedAfterDelete, _ := sqliteStore.List()
+	// Ожидаем 0 элементов после удаления
+	assert.Len(t, savedAfterDelete, 0)
+}
