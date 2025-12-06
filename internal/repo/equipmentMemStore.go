@@ -1,13 +1,7 @@
 package repo
 
 import (
-	"errors"
-	
 	"go_rest_crud/internal/entity"
-)
-
-var (
-	NotFoundErr = errors.New("not found")
 )
 
 type MemStore struct {

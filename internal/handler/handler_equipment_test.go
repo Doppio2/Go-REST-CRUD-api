@@ -18,6 +18,7 @@ import (
 	"go_rest_crud/internal/repo"
 )
 
+// Функция для тестов. Читает тестовый набор данных.
 func readTestData(t *testing.T, name string) []byte {
     t.Helper()
     content, err := os.ReadFile("testdata/" + name)
@@ -28,8 +29,12 @@ func readTestData(t *testing.T, name string) []byte {
     return content
 }
 
+// Функция для тестов. Инициализирует sqlite.
 func InitSqliteTest() *repo.SQLiteStore {
-	/*sql.Open("sqlite", "db/equipment.db")*/
+	// TODO: Позже нужно будет создавать файл с бд.
+	// Пока что я использую :memory параметр, что хранит всю бд в оперативной памяти.
+	// sql.Open("sqlite", "db/equipment.db")
+	// sql.Open("sqlite", "db/equipment.db")
 	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		log.Fatal("Can't connect to a data base: ", err)
@@ -41,6 +46,7 @@ func InitSqliteTest() *repo.SQLiteStore {
 	return s
 }
 
+// Функция для тестов. Создаем таблицу equipment для тестирования работоспособности.
 func SQLiteCreateEquipmentTableTest(s *repo.SQLiteStore) {
 	sqlCreateTable := `
 	CREATE TABLE IF NOT EXISTS equipment (
@@ -57,6 +63,7 @@ func SQLiteCreateEquipmentTableTest(s *repo.SQLiteStore) {
 	// NOTE: test
 }
 
+// Функция для тестов. Основная тестирующая функция, которая проверяет работоспособность всего веб-приложения.
 func TestEquipmentHandlerCRUD_Integration(t *testing.T) {
 	sqliteStore := InitSqliteTest()
 	SQLiteCreateEquipmentTableTest(sqliteStore)

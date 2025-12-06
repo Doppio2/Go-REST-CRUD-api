@@ -12,46 +12,29 @@ import (
 	"github.com/gosimple/slug"
 )
 
+// Регулярные выражения для обращения к страницам с определенным оборудованием.
 var (
 	EquipmentRe       = regexp.MustCompile(`^/equipment/*$`)
 	EquipmentReWithID = regexp.MustCompile(`^/equipment/([a-z0-9]+(?:-[a-z0-9]+)*)$`)
 )
 
-// TODO: move it to handler_error.go
-func InternalServerErrorHandler(w http.ResponseWriter, r *http.Request) {
-    w.WriteHeader(http.StatusInternalServerError)
-    w.Write([]byte("500 Internal Server Error"))
-}
-
-func NotFoundHandler(w http.ResponseWriter, r *http.Request) {
-    w.WriteHeader(http.StatusNotFound)
-    w.Write([]byte("404 Not Found"))
-}
-
-// TODO: move it to handler_home.go
-type HomeHandler struct{}
-
-func (h *HomeHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
-	writer.Write([]byte("This is my home page"))
-}
-
+// Ручка для сущности Equipment.
 type EquipmentHandler struct {
-	//store repo.EquipmentStore
 	store repo.EquipmentStore
 }
 
+// Конструктор для ручки Equipment.
 func NewEquipmentHandler(s repo.EquipmentStore) *EquipmentHandler {
 	return &EquipmentHandler {
 		store: s,
 	}
 }
 
-//func (h *EquipmentHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
-//	writer.Write([]byte("Equipment page"))
-//}
-
-func (h *EquipmentHandler) CreateEquipment(w http.ResponseWriter, r *http.Request) {
-
+// Функции обработчики запросов.
+// TODO: подумать над тем, нужно ли оставлять это функцией. И зачем вообще в конце названий equipment стоит? 
+// Едва ли там какой-то конфликт имен есть? Это касается всех функций, которые идут следом.
+// Создание записи в бд.
+func (h *EquipmentHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var equipment entity.Equipment
 
 	err := json.NewDecoder(r.Body).Decode(&equipment)
@@ -75,7 +58,8 @@ func (h *EquipmentHandler) CreateEquipment(w http.ResponseWriter, r *http.Reques
 	w.WriteHeader(http.StatusOK)
 }
 
-func (h *EquipmentHandler) ListEquipment(w http.ResponseWriter, r *http.Request) {
+// Получение всех записей из бд.
+func (h *EquipmentHandler) List(w http.ResponseWriter, r *http.Request) {
     equipmentMap, err := h.store.List()
     if err != nil {
         InternalServerErrorHandler(w, r)
@@ -98,7 +82,8 @@ func (h *EquipmentHandler) ListEquipment(w http.ResponseWriter, r *http.Request)
     w.Write(jsonBytes)
 }
 
-func (h *EquipmentHandler) GetEquipment(w http.ResponseWriter, r *http.Request) {
+// Получение 
+func (h *EquipmentHandler) Get(w http.ResponseWriter, r *http.Request) {
 	matches := EquipmentReWithID.FindStringSubmatch(r.URL.Path)
 
 	if len(matches) < 2 {
@@ -126,7 +111,7 @@ func (h *EquipmentHandler) GetEquipment(w http.ResponseWriter, r *http.Request) 
 	w.Write(jsonBytes)
 }
 
-func (h *EquipmentHandler) UpdateEquipment(w http.ResponseWriter, r *http.Request) {
+func (h *EquipmentHandler) Update(w http.ResponseWriter, r *http.Request) {
     matches := EquipmentReWithID.FindStringSubmatch(r.URL.Path)
     if len(matches) < 2 {
         InternalServerErrorHandler(w, r)
@@ -153,7 +138,7 @@ func (h *EquipmentHandler) UpdateEquipment(w http.ResponseWriter, r *http.Reques
     w.WriteHeader(http.StatusOK)
 }
 
-func (h *EquipmentHandler) DeleteEquipment(w http.ResponseWriter, r *http.Request) {
+func (h *EquipmentHandler) Delete(w http.ResponseWriter, r *http.Request) {
     matches := EquipmentReWithID.FindStringSubmatch(r.URL.Path)
     if len(matches) < 2 {
         InternalServerErrorHandler(w, r)
@@ -166,22 +151,23 @@ func (h *EquipmentHandler) DeleteEquipment(w http.ResponseWriter, r *http.Reques
     w.WriteHeader(http.StatusNoContent)
 }
 
+// Функций для 
 func (h *EquipmentHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case r.Method == http.MethodPost && EquipmentRe.MatchString(r.URL.Path):
-		h.CreateEquipment(w, r)
+		h.Create(w, r)
 		return
 	case r.Method == http.MethodGet && EquipmentRe.MatchString(r.URL.Path):
-		h.ListEquipment(w, r)
+		h.List(w, r)
 		return
 	case r.Method == http.MethodGet && EquipmentReWithID.MatchString(r.URL.Path):
-		h.GetEquipment(w, r)
+		h.Get(w, r)
 		return
 	case r.Method == http.MethodPut && EquipmentReWithID.MatchString(r.URL.Path):
-		h.UpdateEquipment(w, r)
+		h.Update(w, r)
 		return
 	case r.Method == http.MethodDelete && EquipmentReWithID.MatchString(r.URL.Path):
-		h.DeleteEquipment(w, r)
+		h.Delete(w, r)
 		return
 	default:
 		return

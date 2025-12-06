@@ -1,4 +1,4 @@
-package repo
+package sqlite
 
 import (
 	"fmt"
@@ -7,21 +7,22 @@ import (
 	"github.com/gosimple/slug"
 	_ "github.com/glebarez/go-sqlite"
 
+	"go_rest_crud/internal/repo"
 	"go_rest_crud/internal/entity"
 )
 
-type SQLiteStore struct {
+type SQLiteEquipmentStore struct {
 	*sql.DB
 }
 
 // TODO: add the port and it parameters. For now it's only :memory.
-func NewSQLiteStore(db *sql.DB) *SQLiteStore {
-	return &SQLiteStore{
+func NewSQLiteEquipmentStore(db *sql.DB) *SQLiteEquipmentStore {
+	return &SQLiteEquipmentStore{
 		db,
 	}
 }
 
-func (store *SQLiteStore) PrintDBSchema() {
+func (store *SQLiteEquipmentStore) PrintDBSchema() {
 	rows, err := store.Query("PRAGMA table_info(equipment);")
 	if err != nil {
 		log.Fatal(err)
@@ -43,30 +44,30 @@ func (store *SQLiteStore) PrintDBSchema() {
 	}
 }
 
-func (s *SQLiteStore) Add(name string, e entity.Equipment) error {
-    query := "INSERT INTO equipment (name, field) VALUES (?, ?)"
-    _, err := s.Exec(query, name, e.Field)
+func (s *SQLiteEquipmentStore) Add(name string, e entity.Equipment) error {
+    query := "INSERT INTO equipment (name, description) VALUES (?, ?)"
+    _, err := s.Exec(query, name, e.Description)
     return err
 }
 
-func (s *SQLiteStore) Get(name string) (entity.Equipment, error) {
+func (s *SQLiteEquipmentStore) Get(name string) (entity.Equipment, error) {
     var e entity.Equipment
-    err := s.QueryRow("SELECT id, name, field FROM equipment WHERE name = ?", name).
-        Scan(&e.ID, &e.Name, &e.Field)
+    err := s.QueryRow("SELECT id, name, description FROM equipment WHERE name = ?", name).
+        Scan(&e.ID, &e.Name, &e.Description)
     if err == sql.ErrNoRows {
-        return e, NotFoundErr
+        return e, repo.NotFoundErr
     }
     return e, err
 }
 
-func (s *SQLiteStore) Update(name string, e entity.Equipment) error {
+func (s *SQLiteEquipmentStore) Update(name string, e entity.Equipment) error {
     newSlug := slug.Make(e.Name)
-    _, err := s.Exec("UPDATE equipment SET name = ?, field = ? WHERE name = ?", newSlug, e.Field, name)
+    _, err := s.Exec("UPDATE equipment SET name = ?, description = ? WHERE name = ?", newSlug, e.Description, name)
     return err
 }
 
-func (s *SQLiteStore) List() (map[string]entity.Equipment, error) {
-    rows, err := s.Query("SELECT id, name, field FROM equipment")
+func (s *SQLiteEquipmentStore) List() (map[string]entity.Equipment, error) {
+    rows, err := s.Query("SELECT id, name, description FROM equipment")
     if err != nil {
         return nil, err
     }
@@ -75,7 +76,7 @@ func (s *SQLiteStore) List() (map[string]entity.Equipment, error) {
     result := make(map[string]entity.Equipment)
     for rows.Next() {
         var e entity.Equipment
-        if err := rows.Scan(&e.ID, &e.Name, &e.Field); err != nil {
+        if err := rows.Scan(&e.ID, &e.Name, &e.Description); err != nil {
             return nil, err
         }
         result[e.Name] = e
@@ -83,14 +84,14 @@ func (s *SQLiteStore) List() (map[string]entity.Equipment, error) {
     return result, nil
 }
 
-func (s *SQLiteStore) Remove(name string) error {
+func (s *SQLiteEquipmentStore) Remove(name string) error {
     res, err := s.Exec("DELETE FROM equipment WHERE name = ?", name)
     if err != nil {
         return err
     }
     count, _ := res.RowsAffected()
     if count == 0 {
-        return NotFoundErr
+        return repo.NotFoundErr
     }
     return nil
 }
