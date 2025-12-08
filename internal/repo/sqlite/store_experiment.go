@@ -23,18 +23,18 @@ func NewSQLiteExperimentStore(db *sql.DB) *SQLiteExperimentStore {
 	}
 }
 
-func (s *SQLiteExperimentStore) Add(name string, e entity.Experiment) error {
+func (s *SQLiteExperimentStore) Add(e entity.Experiment) error {
 	// TODO: Заглушка
 	return repo.NotFoundErr
 }
 
-func (s *SQLiteExperimentStore) Get(name string) (entity.Experiment, error) {
+func (s *SQLiteExperimentStore) Get(id int) (entity.Experiment, error) {
 	// TODO: Заглушка
 	e := entity.Experiment{1, "Example Experiment", "Some Description"}
 	return e, repo.NotFoundErr
 }
 
-func (s *SQLiteExperimentStore) Update(name string, e entity.Experiment) error {
+func (s *SQLiteExperimentStore) Update(id int, e entity.Experiment) error {
 	// TODO: Заглушка
 	return repo.NotFoundErr
 }
@@ -58,7 +58,7 @@ func (s *SQLiteExperimentStore) List() (map[string]entity.Experiment, error) {
     return result, nil
 }
 
-func (s *SQLiteExperimentStore) Remove(name string) error {
+func (s *SQLiteExperimentStore) Remove(id int) error {
 	// TODO: Заглушка
 	return repo.NotFoundErr
 }

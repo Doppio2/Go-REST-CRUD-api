@@ -4,7 +4,6 @@ import (
 //	"fmt"
 	"database/sql"
 //	"log"
-//	"github.com/gosimple/slug"
 	_ "github.com/glebarez/go-sqlite"
 
 	"go_rest_crud/internal/repo"

@@ -5,17 +5,17 @@ import (
 	"regexp"
 	"encoding/json"
 	"log"
+	"strconv"
 
 	"go_rest_crud/internal/repo"
 	"go_rest_crud/internal/entity"
-
-	"github.com/gosimple/slug"
 )
 
 // Регулярные выражения для обращения к страницам с определенным оборудованием.
 var (
-	EquipmentRe       = regexp.MustCompile(`^/equipment/*$`)
-	EquipmentReWithID = regexp.MustCompile(`^/equipment/([a-z0-9]+(?:-[a-z0-9]+)*)$`)
+	// TODO: пока что временно тут чисто числа в url, но я пока не особо хочу заморачиваться с этим всем. Так что пусть будет так.
+	EquipmentRe = regexp.MustCompile(`^/equipment/?$`)
+	EquipmentReWithID = regexp.MustCompile(`^/equipment/([0-9]+)$`)
 )
 
 // Ручка для сущности Equipment.
@@ -40,15 +40,16 @@ func (h *EquipmentHandler) Create(w http.ResponseWriter, r *http.Request) {
 	err := json.NewDecoder(r.Body).Decode(&equipment)
 
 	if err != nil {
+		// TODO: Log later.
 		// TODO: Pass errors to the InternalServerErorHandler function.
 		log.Fatal("Cant get json body: ", err)
 		InternalServerErrorHandler(w, r)
 		return 
 	}
 
-	resourceID := slug.Make(equipment.Name)
-	err = h.store.Add(resourceID, equipment)
+	err = h.store.Add(equipment)
 	if err != nil {
+		// TODO: Log later.
 		// TODO: Pass errors to the InternalServerErorHandler function.
 		log.Fatal("Can not add equipment to the database", err)
 		InternalServerErrorHandler(w, r)
@@ -62,6 +63,7 @@ func (h *EquipmentHandler) Create(w http.ResponseWriter, r *http.Request) {
 func (h *EquipmentHandler) List(w http.ResponseWriter, r *http.Request) {
     equipmentMap, err := h.store.List()
     if err != nil {
+		// TODO: Log later.
         InternalServerErrorHandler(w, r)
         return
     }
@@ -91,7 +93,13 @@ func (h *EquipmentHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	equipment, err := h.store.Get(matches[1])
+	id, err := strconv.Atoi(matches[1])
+	if err != nil {
+		// TODO: Log later.
+		log.Fatal("Can't get element ID: ", err)
+	}
+
+	equipment, err := h.store.Get(id)
 	if err != nil {
 		if err == repo.NotFoundErr {
 			NotFoundHandler(w, r)
@@ -126,7 +134,13 @@ func (h *EquipmentHandler) Update(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    if err := h.store.Update(matches[1], equipment); err != nil {
+	id, err := strconv.Atoi(matches[1])
+	if err != nil {
+		// TODO: Log later.
+		log.Fatal("Can't get elemetn ID: ", err)
+	}
+
+    if err := h.store.Update(id, equipment); err != nil {
         if err == repo.NotFoundErr {
             NotFoundHandler(w, r)
             return
@@ -144,7 +158,14 @@ func (h *EquipmentHandler) Delete(w http.ResponseWriter, r *http.Request) {
         InternalServerErrorHandler(w, r)
         return
     }
-    if err := h.store.Remove(matches[1]); err != nil {
+
+	id, err := strconv.Atoi(matches[1])
+	if err != nil {
+		// TODO: Log later.
+		log.Fatal("Can't get element ID: ", err)
+	}
+
+    if err := h.store.Remove(id); err != nil {
         InternalServerErrorHandler(w, r)
         return
     }

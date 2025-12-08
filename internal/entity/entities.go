@@ -2,13 +2,13 @@ package entity
 
 // Сущность.
 type Equipment struct {
-	ID            int     `json:"id,omitempty"`     // TODO: узнать, нужно ли это вообще.
+	ID            int     `json:"id"`     // TODO: узнать, нужно ли это вообще.
 	Name          string  `json:"name"`
 	Description   string  `json:"field"`
 }
 
 type Experiment struct {
-	ID            int     `json:"id,omitempty"`     // TODO: узнать, нужно ли это вообще.
+	ID            int     `json:"id"`     // TODO: узнать, нужно ли это вообще.
 	Name          string  `json:"name"`
 	Description   string  `json:"field"`            
 }

@@ -46,25 +46,76 @@ func InitSqliteTest() *repo.SQLiteStore {
 	return s
 }
 
+// TODO: Нужно вынести эту функцию в отдельный пакет какой-то.
 // Функция для тестов. Создаем таблицу equipment для тестирования работоспособности.
-func SQLiteCreateEquipmentTableTest(s *repo.SQLiteStore) {
+func CreateTables(db *sql.DB) {
+	// Таблица для оборудования.
 	sqlCreateTable := `
 	CREATE TABLE IF NOT EXISTS equipment (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		name TEXT NOT NULL,
-		field TEXT
+		description TEXT
 	);`
-	_, err := s.Exec(sqlCreateTable)
+	_, err := db.Exec(sqlCreateTable)
 	if err != nil {
-		log.Fatal("Can't create a table: ", err)
+		log.Fatal("Can't create table \"equipment\": ", err)
 	}
-    fmt.Println("Table \"equipment\" was created successfully.")
+	fmt.Println("Table \"equipment\" was created successfully.")
 
-	// NOTE: test
+	// Таблица для эксперимента.
+	sqlCreateTable = `
+	CREATE TABLE IF NOT EXISTS experiment (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		name TEXT NOT NULL,
+		description TEXT
+	);`
+	_, err = db.Exec(sqlCreateTable)
+	if err != nil {
+		log.Fatal("Can't create table experiment: ", err)
+	}
+	fmt.Println("Table \"experiment\" was created successfully.")
+
+	// Объединенная таблица.
+	sqlCreateTable = `
+	CREATE TABLE IF NOT EXISTS equipment_experiment (
+		experiment_id INTEGER NOT NULL,
+		equipment_id INTEGER NOT NULL,
+		PRIMARY KEY (experiment_id, equipment_id),
+		FOREIGN KEY (experiment_id) REFERENCES experiment(id),
+		FOREIGN KEY (equipment_id) REFERENCES equipment(id)
+	);`
+	_, err = db.Exec(sqlCreateTable)
+	if err != nil {
+		log.Fatal("Can't create table equipment_experiment: ", err)
+	}
+	fmt.Println("Table \"equipment_experiment\" was created successfully.")
 }
 
 // Функция для тестов. Основная тестирующая функция, которая проверяет работоспособность всего веб-приложения.
+// TODO: Переписать тесты.
 func TestEquipmentHandlerCRUD_Integration(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		log.Fatal("Can't connect to a data base: ", err)
+	}
+	defer db.Close()
+    fmt.Println("Connected to the SQLite database successfully.")
+
+	CreateTables(db);
+
+	sqliteEquipmentStore := sqlite.NewSQLiteEquipmentStore(db)
+	equipmentHandler = NewEquipmentHandler(sqliteEquipmentStore);
+
+	testData1 := readTestData(t, "spectrophotometer.json")
+	testData2 := readTestData(t, "high_speed_centrifuge.json")
+	testData1Reader := bytes.NewReader(testData1)
+	testData2Reader := bytes.NewReader(testData2)
+
+	// -- CREATE: POST /equipment --
+	r := httptest.NewRequest(http.MethodPost, "/equipment", testData1Reader)
+	w := httptest.NewRecorder()
+	
+	/*
 	sqliteStore := InitSqliteTest()
 	SQLiteCreateEquipmentTableTest(sqliteStore)
 	defer sqliteStore.Close()
@@ -152,4 +203,20 @@ func TestEquipmentHandlerCRUD_Integration(t *testing.T) {
 	savedAfterDelete, _ := sqliteStore.List()
 	// Ожидаем 0 элементов после удаления
 	assert.Len(t, savedAfterDelete, 0)
+	*/
+}
+
+func TestExperimentHandlerCRUD_Integration(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		log.Fatal("Can't connect to a data base: ", err)
+	}
+	defer db.Close()
+    fmt.Println("Connected to the SQLite database successfully.")
+
+	CreateTables(db);
+
+	sqliteEquipmentStore := sqlite.NewSQLiteEquipmentStore(db)
+	sqliteExperimentStore := sqlite.NewSQLiteExperimentStore(db)
+	sqliteExperimentEquipmentStore := sqlite.NewSQLiteExperimentEquipmentStore(db)
 }

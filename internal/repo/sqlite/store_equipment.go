@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"database/sql"
 	"log"
-	"github.com/gosimple/slug"
 	_ "github.com/glebarez/go-sqlite"
 
 	"go_rest_crud/internal/repo"
@@ -44,15 +43,16 @@ func (store *SQLiteEquipmentStore) PrintDBSchema() {
 	}
 }
 
-func (s *SQLiteEquipmentStore) Add(name string, e entity.Equipment) error {
+func (s *SQLiteEquipmentStore) Add(e entity.Equipment) error {
     query := "INSERT INTO equipment (name, description) VALUES (?, ?)"
-    _, err := s.Exec(query, name, e.Description)
+    _, err := s.Exec(query, e.Name, e.Description)
     return err
 }
 
-func (s *SQLiteEquipmentStore) Get(name string) (entity.Equipment, error) {
+// Стоит ли назвать функцию GetById, а не просто Get???? Не знаю пока. Если других фукнция не планируется, мб и не стоит.
+func (s *SQLiteEquipmentStore) Get(id int) (entity.Equipment, error) {
     var e entity.Equipment
-    err := s.QueryRow("SELECT id, name, description FROM equipment WHERE name = ?", name).
+    err := s.QueryRow("SELECT id, name, description FROM equipment WHERE id = ?", id).
         Scan(&e.ID, &e.Name, &e.Description)
     if err == sql.ErrNoRows {
         return e, repo.NotFoundErr
@@ -60,9 +60,8 @@ func (s *SQLiteEquipmentStore) Get(name string) (entity.Equipment, error) {
     return e, err
 }
 
-func (s *SQLiteEquipmentStore) Update(name string, e entity.Equipment) error {
-    newSlug := slug.Make(e.Name)
-    _, err := s.Exec("UPDATE equipment SET name = ?, description = ? WHERE name = ?", newSlug, e.Description, name)
+func (s *SQLiteEquipmentStore) Update(id int, e entity.Equipment) error {
+    _, err := s.Exec("UPDATE equipment SET name = ?, description = ? WHERE id = ?", e.Name, e.Description, id)
     return err
 }
 
@@ -84,8 +83,8 @@ func (s *SQLiteEquipmentStore) List() (map[string]entity.Equipment, error) {
     return result, nil
 }
 
-func (s *SQLiteEquipmentStore) Remove(name string) error {
-    res, err := s.Exec("DELETE FROM equipment WHERE name = ?", name)
+func (s *SQLiteEquipmentStore) Remove(id int) error {
+    res, err := s.Exec("DELETE FROM equipment WHERE id = ?", id)
     if err != nil {
         return err
     }

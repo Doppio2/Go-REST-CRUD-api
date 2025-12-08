@@ -10,28 +10,34 @@ var (
 	NotFoundErr = errors.New("not found")
 )
 
+// TODO: Мб стоит это объединить с EquipmentStore, а то у них разницы немного.
+// Либо просто сделать ExperimentStore совместно с ExperimentEquipmentStore.
+// А то у меня тогда просто два одинаковых интерфейса.
+// Больше склоняюсь к варианту с общим интерфейсом с ExperimentEquipmentStore.
 type EquipmentStore interface {
-    Add(name string, equipment entity.Equipment) error
-    Get(name string) (entity.Equipment, error)
-    Update(name string, equipment entity.Equipment) error
+    Add(equipment entity.Equipment) error
+    Get(id int) (entity.Equipment, error)
+    Update(id int, equipment entity.Equipment) error
     List() (map[string]entity.Equipment, error)
-    Remove(name string) error
+    Remove(id int) error
 }
 
-// TODO: подумать какие операции нужны будут для Experiment.
 type ExperimentStore interface {
-    Add(name string, equipment entity.Experiment) error
-    Get(name string) (entity.Experiment, error)
-    Update(name string, equipment entity.Experiment) error
+    Add(equipment entity.Experiment) error
+    Get(id int) (entity.Experiment, error)
+    Update(id int, equipment entity.Experiment) error
     List() (map[string]entity.Experiment, error)
-    Remove(name string) error
+    Remove(id int) error
 }
 
 // TODO: подумать какие операции нужны будут для ExperimentEquipment.
 type ExperimentEquipmentStore interface {
+	// TODO: Вместо названий нужно использовать id ключ элемента.
     Add(name string, equipment entity.ExperimentEquipment) error
     Get(name string) (entity.ExperimentEquipment, error)
     Update(name string, equipment entity.ExperimentEquipment) error
     List() (map[string]entity.ExperimentEquipment, error)
     Remove(name string) error
+
+	// TODO: тут будут еще операции.
 }
