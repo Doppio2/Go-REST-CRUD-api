@@ -65,20 +65,20 @@ func (s *SQLiteEquipmentStore) Update(id int, e entity.Equipment) error {
     return err
 }
 
-func (s *SQLiteEquipmentStore) List() (map[string]entity.Equipment, error) {
+func (s *SQLiteEquipmentStore) List() (map[int]entity.Equipment, error) {
     rows, err := s.Query("SELECT id, name, description FROM equipment")
     if err != nil {
         return nil, err
     }
     defer rows.Close()
 
-    result := make(map[string]entity.Equipment)
+    result := make(map[int]entity.Equipment)
     for rows.Next() {
         var e entity.Equipment
         if err := rows.Scan(&e.ID, &e.Name, &e.Description); err != nil {
             return nil, err
         }
-        result[e.Name] = e
+        result[e.ID] = e
     }
     return result, nil
 }

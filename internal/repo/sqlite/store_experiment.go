@@ -24,41 +24,53 @@ func NewSQLiteExperimentStore(db *sql.DB) *SQLiteExperimentStore {
 }
 
 func (s *SQLiteExperimentStore) Add(e entity.Experiment) error {
-	// TODO: Заглушка
-	return repo.NotFoundErr
+    query := "INSERT INTO experiment (name, description) VALUES (?, ?)"
+    _, err := s.Exec(query, e.Name, e.Description)
+    return err
 }
 
 func (s *SQLiteExperimentStore) Get(id int) (entity.Experiment, error) {
-	// TODO: Заглушка
-	e := entity.Experiment{1, "Example Experiment", "Some Description"}
-	return e, repo.NotFoundErr
+    var e entity.Experiment
+    err := s.QueryRow("SELECT id, name, description FROM experiment WHERE id = ?", id).
+        Scan(&e.ID, &e.Name, &e.Description)
+    if err == sql.ErrNoRows {
+        return e, repo.NotFoundErr
+    }
+    return e, err
 }
 
 func (s *SQLiteExperimentStore) Update(id int, e entity.Experiment) error {
-	// TODO: Заглушка
-	return repo.NotFoundErr
+    _, err := s.Exec("UPDATE experiment SET name = ?, description = ? WHERE id = ?", e.Name, e.Description, id)
+    return err
 }
 
-func (s *SQLiteExperimentStore) List() (map[string]entity.Experiment, error) {
-    rows, err := s.Query("SELECT id, name, description FROM equipment")
+func (s *SQLiteExperimentStore) List() (map[int]entity.Experiment, error) {
+    rows, err := s.Query("SELECT id, name, description FROM experiment")
     if err != nil {
         return nil, err
     }
     defer rows.Close()
 
-    result := make(map[string]entity.Experiment)
+    result := make(map[int]entity.Experiment)
     for rows.Next() {
         var e entity.Experiment
         if err := rows.Scan(&e.ID, &e.Name, &e.Description); err != nil {
             return nil, err
         }
-        result[e.Name] = e
+        result[e.ID] = e
     }
 
     return result, nil
 }
 
 func (s *SQLiteExperimentStore) Remove(id int) error {
-	// TODO: Заглушка
-	return repo.NotFoundErr
+    res, err := s.Exec("DELETE FROM experiment WHERE id = ?", id)
+    if err != nil {
+        return err
+    }
+    count, _ := res.RowsAffected()
+    if count == 0 {
+        return repo.NotFoundErr
+    }
+    return nil
 }

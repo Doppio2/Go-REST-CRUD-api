@@ -18,7 +18,7 @@ type EquipmentStore interface {
     Add(equipment entity.Equipment) error
     Get(id int) (entity.Equipment, error)
     Update(id int, equipment entity.Equipment) error
-    List() (map[string]entity.Equipment, error)
+    List() (map[int]entity.Equipment, error)
     Remove(id int) error
 }
 
@@ -26,18 +26,13 @@ type ExperimentStore interface {
     Add(equipment entity.Experiment) error
     Get(id int) (entity.Experiment, error)
     Update(id int, equipment entity.Experiment) error
-    List() (map[string]entity.Experiment, error)
+    List() (map[int]entity.Experiment, error)
     Remove(id int) error
 }
 
-// TODO: подумать какие операции нужны будут для ExperimentEquipment.
 type ExperimentEquipmentStore interface {
-	// TODO: Вместо названий нужно использовать id ключ элемента.
-    Add(name string, equipment entity.ExperimentEquipment) error
-    Get(name string) (entity.ExperimentEquipment, error)
-    Update(name string, equipment entity.ExperimentEquipment) error
-    List() (map[string]entity.ExperimentEquipment, error)
-    Remove(name string) error
-
-	// TODO: тут будут еще операции.
+	Add(experimentId int , equipmentId int) error
+    Remove(experimentId int, equipmentId int) error
+    ListEquipment() (map[int]entity.Equipment, error)
+	ListExperiments() (map[int]entity.Experiment, error)
 }

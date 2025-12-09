@@ -31,9 +31,6 @@ func NewEquipmentHandler(s repo.EquipmentStore) *EquipmentHandler {
 }
 
 // Функции обработчики запросов.
-// TODO: подумать над тем, нужно ли оставлять это функцией. И зачем вообще в конце названий equipment стоит? 
-// Едва ли там какой-то конфликт имен есть? Это касается всех функций, которые идут следом.
-// Создание записи в бд.
 func (h *EquipmentHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var equipment entity.Equipment
 

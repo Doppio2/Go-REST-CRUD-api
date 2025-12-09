@@ -83,7 +83,6 @@ func (h *ExperimentHandler) List(w http.ResponseWriter, r *http.Request) {
     w.Write(jsonBytes)
 }
 func (h *ExperimentHandler) Get(w http.ResponseWriter, r *http.Request) {
-	// TODO: Как мне получать по id? просто указывать это в url?????
 	matches := ExperimentReWithID.FindStringSubmatch(r.URL.Path)
 
 	if len(matches) < 2 {
@@ -170,16 +169,20 @@ func (h *ExperimentHandler) Delete(w http.ResponseWriter, r *http.Request) {
     w.WriteHeader(http.StatusNoContent)
 }
 
+// Добавление оборудование к эксперименту. 
 func (h *ExperimentHandler) AddEquipment(w http.ResponseWriter, r *http.Request) {
 }
 
+// Удаление оборудования из эксперимента
+func (h *ExperimentHandler) DeleteEquipment(w http.ResponseWriter, r *http.Request) {
+}
+
+// Получения списка всего оборудования, которое используется в эксперименте.
 func (h *ExperimentHandler) ListEquipment(w http.ResponseWriter, r *http.Request) {
 }
 
-func (h *ExperimentHandler) GetEquipment(w http.ResponseWriter, r *http.Request) {
-}
-
-func (h *ExperimentHandler) DeleteEquipment(w http.ResponseWriter, r *http.Request) {
+// Функция для получения списка всех экспериментов, где используется это оборудование.
+func (h *ExperimentHandler) ListExperiments(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ExperimentHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {

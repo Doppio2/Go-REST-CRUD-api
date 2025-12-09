@@ -14,6 +14,8 @@ type SQLiteExperimentEquipmentStore struct {
 	*sql.DB
 }
 
+// TODO: нужно реализовать методы для взаимодействия со связующей таблицей.
+
 // TODO: add the port and it parameters. For now it's only :memory.
 func NewSQLiteExperimentEquipmentStore(db *sql.DB) *SQLiteExperimentEquipmentStore {
 	return &SQLiteExperimentEquipmentStore{
@@ -21,42 +23,22 @@ func NewSQLiteExperimentEquipmentStore(db *sql.DB) *SQLiteExperimentEquipmentSto
 	}
 }
 
-func (s *SQLiteExperimentEquipmentStore) Add(name string, e entity.ExperimentEquipment) error {
+func (s *SQLiteExperimentEquipmentStore) Add(experimentId int, equipmentId int) error {
 	// TODO: Заглушка
 	return repo.NotFoundErr
 }
 
-func (s *SQLiteExperimentEquipmentStore) Get(name string) (entity.ExperimentEquipment, error) {
+func (s *SQLiteExperimentEquipmentStore) Remove(experimentId int, equipmentId int) error {
 	// TODO: Заглушка
-	e := entity.ExperimentEquipment{1, 2}
-	return e, repo.NotFoundErr
+	return nil
 }
 
-func (s *SQLiteExperimentEquipmentStore) Update(name string, e entity.ExperimentEquipment) error {
+func (s *SQLiteExperimentEquipmentStore) ListEquipment() (map[int]entity.Equipment, error) {
 	// TODO: Заглушка
-	return repo.NotFoundErr
+	return nil, nil
 }
 
-func (s *SQLiteExperimentEquipmentStore) List() (map[string]entity.ExperimentEquipment, error) {
+func (s *SQLiteExperimentEquipmentStore) ListExperiments() (map[int]entity.Experiment, error) {
 	// TODO: Заглушка
-    rows, err := s.Query("SELECT id, name, description FROM equipment")
-    if err != nil {
-        return nil, err
-    }
-    defer rows.Close()
-
-    result := make(map[string]entity.ExperimentEquipment)
-    for rows.Next() {
-        var e entity.ExperimentEquipment
-        if err := rows.Scan(&e.EquipmentID, &e.ExperimentID); err != nil {
-            return nil, err
-        }
-    }
-
-    return result, nil
-}
-
-func (s *SQLiteExperimentEquipmentStore) Remove(name string) error {
-	// TODO: Заглушка
-	return repo.NotFoundErr
+	return nil, nil
 }
