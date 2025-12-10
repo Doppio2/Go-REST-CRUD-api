@@ -23,24 +23,24 @@ func NewSQLiteExperimentStore(db *sql.DB) *SQLiteExperimentStore {
 	}
 }
 
-func (s *SQLiteExperimentStore) Add(e entity.Experiment) error {
+func (s *SQLiteExperimentStore) Add(ex entity.Experiment) error {
     query := "INSERT INTO experiment (name, description) VALUES (?, ?)"
-    _, err := s.Exec(query, e.Name, e.Description)
+    _, err := s.Exec(query, ex.Name, ex.Description)
     return err
 }
 
 func (s *SQLiteExperimentStore) Get(id int) (entity.Experiment, error) {
-    var e entity.Experiment
+    var ex entity.Experiment
     err := s.QueryRow("SELECT id, name, description FROM experiment WHERE id = ?", id).
-        Scan(&e.ID, &e.Name, &e.Description)
+        Scan(&ex.ID, &ex.Name, &ex.Description)
     if err == sql.ErrNoRows {
-        return e, repo.NotFoundErr
+        return ex, repo.NotFoundErr
     }
-    return e, err
+    return ex, err
 }
 
-func (s *SQLiteExperimentStore) Update(id int, e entity.Experiment) error {
-    _, err := s.Exec("UPDATE experiment SET name = ?, description = ? WHERE id = ?", e.Name, e.Description, id)
+func (s *SQLiteExperimentStore) Update(id int, ex entity.Experiment) error {
+    _, err := s.Exec("UPDATE experiment SET name = ?, description = ? WHERE id = ?", ex.Name, ex.Description, id)
     return err
 }
 
@@ -53,17 +53,18 @@ func (s *SQLiteExperimentStore) List() (map[int]entity.Experiment, error) {
 
     result := make(map[int]entity.Experiment)
     for rows.Next() {
-        var e entity.Experiment
-        if err := rows.Scan(&e.ID, &e.Name, &e.Description); err != nil {
+        var ex entity.Experiment
+        if err := rows.Scan(&ex.ID, &ex.Name, &ex.Description); err != nil {
             return nil, err
         }
-        result[e.ID] = e
+        result[ex.ID] = ex
     }
 
     return result, nil
 }
 
 func (s *SQLiteExperimentStore) Remove(id int) error {
+	// TODO: В остальных структурах у меня выражение DELETE FROM ... WHERE в отдельную перменную вынесено. Возможно стоит так же сделать.
     res, err := s.Exec("DELETE FROM experiment WHERE id = ?", id)
     if err != nil {
         return err

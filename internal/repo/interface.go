@@ -14,6 +14,8 @@ var (
 // Либо просто сделать ExperimentStore совместно с ExperimentEquipmentStore.
 // А то у меня тогда просто два одинаковых интерфейса.
 // Больше склоняюсь к варианту с общим интерфейсом с ExperimentEquipmentStore.
+// TODO: во всех методах с List() я получаю все как map[int]'Entity'. 
+// Если честно это выглядит каким-то избытком, но пока лучше оставлю. Не очень хочется щас это менять. Но мб стоит.
 type EquipmentStore interface {
     Add(equipment entity.Equipment) error
     Get(id int) (entity.Equipment, error)
@@ -33,6 +35,7 @@ type ExperimentStore interface {
 type ExperimentEquipmentStore interface {
 	Add(experimentId int , equipmentId int) error
     Remove(experimentId int, equipmentId int) error
-    ListEquipment() (map[int]entity.Equipment, error)
-	ListExperiments() (map[int]entity.Experiment, error)
+    ListEquipment(experimentId int) (map[int]entity.Equipment, error)
+	// NOTE: пока что это нигде не используется. И не думаю, что я придумаю, как это использовать.
+	ListExperiments(equipmentId int) (map[int]entity.Experiment, error)
 }
