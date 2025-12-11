@@ -29,6 +29,42 @@ type ExperimentHandler struct {
 	ExperimentEquipmentStore      repo.ExperimentEquipmentStore
 }
 
+func GetExperimentID(w http.ResponseWriter, r *http.Request) (int, error) {
+	parts := strings.Split(r.URL.Path, "/")
+	var err error
+	if len(parts) < 3 {
+		http.Error(w, "Invalid URL", http.StatusBadRequest)
+		return 0, err
+	}
+
+	// Получаем id эксперемента из url, куда мы будет добавлять оборудование.
+	result, err := strconv.Atoi(parts[2])
+	if err != nil {
+		http.Error(w, "Invalid experiment ID", http.StatusBadRequest)
+		return 0, err
+	}
+
+	return result, err
+}
+
+func GetEquipmentID(w http.ResponseWriter, r *http.Request) (int, error) {
+	parts := strings.Split(r.URL.Path, "/")
+	var err error
+	if len(parts) < 5 {
+		http.Error(w, "Invalid URL", http.StatusBadRequest)
+		return 0, err
+	}
+
+	// Получаем id эксперемента из url, куда мы будет добавлять оборудование.
+	result, err := strconv.Atoi(parts[4])
+	if err != nil {
+		http.Error(w, "Invalid equipment ID", http.StatusBadRequest)
+		return 0, err
+	}
+
+	return result, err
+}
+
 // Конструктор для ручки Experiment.
 func NewExperimentHandler(experimentStore repo.ExperimentStore, 
                           equipmentStore repo.EquipmentStore,
@@ -177,14 +213,7 @@ func (h *ExperimentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 // Добавление оборудование к эксперименту. 
 func (h *ExperimentHandler) AddEquipment(w http.ResponseWriter, r *http.Request) {
-	parts := strings.Split(r.URL.Path, "/")
-	if len(parts) < 3 {
-		http.Error(w, "Invalid URL", http.StatusBadRequest)
-		return
-	}
-
-	// Получаем id эксперемента из url, куда мы будет добавлять оборудование.
-	experimentID, err := strconv.Atoi(parts[2])
+	experimentID, err := GetExperimentID(w, r)
 	if err != nil {
 		http.Error(w, "Invalid experiment ID", http.StatusBadRequest)
 		return
@@ -218,13 +247,80 @@ func (h *ExperimentHandler) AddEquipment(w http.ResponseWriter, r *http.Request)
 
 // Получения списка всего оборудования, которое используется в эксперименте.
 func (h *ExperimentHandler) ListEquipment(w http.ResponseWriter, r *http.Request) {
+	experimentID, err := GetExperimentID(w, r)
+	if err != nil {
+		http.Error(w, "Invalid experiment ID", http.StatusBadRequest)
+		return
+	}
+
+	equipmentMap, err := h.ExperimentEquipmentStore.ListEquipment(experimentID)
+	if err != nil {
+		http.Error(w, "Failed to fetch equipment list", http.StatusInternalServerError)
+		return
+	}
+
+	var equipmentList []entity.Equipment
+	for _, eq := range equipmentMap {
+		equipmentList = append(equipmentList , eq)
+	}
+
+    jsonBytes, err := json.Marshal(equipmentList)
+    if err != nil {
+        InternalServerErrorHandler(w, r)
+        return
+    }
+
+	// TODO: Возможно стоит выделить это в отдельную функцию.
+    w.Header().Set("Content-Type", "application/json")
+    w.WriteHeader(http.StatusOK)
+    w.Write(jsonBytes)
 }
 
 func (h *ExperimentHandler) GetEquipment(w http.ResponseWriter, r *http.Request) {
+	// TODO: нужно сделать функция типа ParserIDsFromUrl(), которая будет всегда возвращать два значения, experimentId и EquipmentId.
+	experimentID, err := GetExperimentID(w, r)
+	if err != nil {
+		http.Error(w, "Invalid experiment ID", http.StatusBadRequest)
+		return
+	}
+	equipmentID, err := GetEquipmentID(w, r)
+	if err != nil {
+		http.Error(w, "Invalid experiment ID", http.StatusBadRequest)
+		return
+	}
+
+	equipment, err := h.ExperimentEquipmentStore.GetEquipment(equipmentID, experimentID)
+	if err != nil {
+		NotFoundHandler(w, r)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(equipment)
 }
 
 // Удаление оборудования из эксперимента
 func (h *ExperimentHandler) DeleteEquipment(w http.ResponseWriter, r *http.Request) {
+	// TODO: нужно сделать функция типа ParserIDsFromUrl(), которая будет всегда возвращать два значения, experimentId и EquipmentId.
+	experimentID, err := GetExperimentID(w, r)
+	if err != nil {
+		http.Error(w, "Invalid experiment ID", http.StatusBadRequest)
+		return
+	}
+	equipmentID, err := GetEquipmentID(w, r)
+	if err != nil {
+		http.Error(w, "Invalid experiment ID", http.StatusBadRequest)
+		return
+	}
+
+	err = h.ExperimentEquipmentStore.Remove(experimentID, equipmentID)
+
+	if err != nil {
+		http.Error(w, "Failed to delete equipment from experiment", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // Функция для получения списка всех экспериментов, где используется это оборудование.
