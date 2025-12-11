@@ -52,8 +52,8 @@ func (s *SQLiteEquipmentStore) Add(e entity.Equipment) error {
 // Стоит ли назвать функцию GetById, а не просто Get???? Не знаю пока. Если других фукнция не планируется, мб и не стоит.
 func (s *SQLiteEquipmentStore) Get(id int) (entity.Equipment, error) {
     var e entity.Equipment
-    err := s.QueryRow("SELECT id, name, description FROM equipment WHERE id = ?", id).
-        Scan(&e.ID, &e.Name, &e.Description)
+    rows := s.QueryRow("SELECT id, name, description FROM equipment WHERE id = ?", id)
+	err := rows.Scan(&e.ID, &e.Name, &e.Description)
     if err == sql.ErrNoRows {
         return e, repo.NotFoundErr
     }

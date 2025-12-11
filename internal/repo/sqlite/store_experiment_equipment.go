@@ -45,6 +45,29 @@ func (s *SQLiteExperimentEquipmentStore) Remove(experimentId int, equipmentId in
 	return nil
 }
 
+func (s *SQLiteExperimentEquipmentStore) GetEquipment(experimentId int, equipmentId int) (entity.Equipment, error) {
+	var e entity.Equipment
+
+	query := `
+	    SELECT equipment.id, equipment.name, equipment.description
+		FROM equipment
+		JOIN experiment_equipment ON experiment_equipment.equipment_id = equipment.id
+		WHERE experiment_equipment.experiment_id = ? AND equipment.id = ?
+	`
+
+	row := s.QueryRow(query, experimentId, equipmentId)
+
+	err := row.Scan(&e.ID, &e.Name, &e.Description)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return entity.Equipment{}, repo.NotFoundErr
+		}
+		return entity.Equipment{}, err
+	}
+
+	return e, nil
+}
+
 // Метод для получения списка оборудования, которое используется в эксперименте.
 func (s *SQLiteExperimentEquipmentStore) ListEquipment(experimentId int) (map[int]entity.Equipment, error) {
 	// TODO: позже лучше разобрать.
@@ -77,6 +100,7 @@ func (s *SQLiteExperimentEquipmentStore) ListEquipment(experimentId int) (map[in
 
 // Метод для получения списка экспериментов, в которых нужно оборудование, id которого мы передаем в метод.
 // NOTE: пока что это нигде не используется. И не думаю, что я придумаю, как это использовать.
+/*
 func (s *SQLiteExperimentEquipmentStore) ListExperiments(equipmentId int) (map[int]entity.Experiment, error) {
 	// TODO: позже лучше разобрать.
 	query := `
@@ -105,3 +129,4 @@ func (s *SQLiteExperimentEquipmentStore) ListExperiments(equipmentId int) (map[i
 
 	return res, nil
 }
+*/

@@ -44,7 +44,7 @@ func CreateTables(db *sql.DB) {
 
 	// Объединенная таблица.
 	sqlCreateTable = `
-	CREATE TABLE IF NOT EXISTS equipment_experiment (
+	CREATE TABLE IF NOT EXISTS experiment_equipment(
 		experiment_id INTEGER NOT NULL,
 		equipment_id INTEGER NOT NULL,
 		PRIMARY KEY (experiment_id, equipment_id),
@@ -53,9 +53,9 @@ func CreateTables(db *sql.DB) {
 	);`
 	_, err = db.Exec(sqlCreateTable)
 	if err != nil {
-		log.Fatal("Can't create table equipment_experiment: ", err)
+		log.Fatal("Can't create table experiment_equipment: ", err)
 	}
-	fmt.Println("Table \"equipment_experiment\" was created successfully.")
+	fmt.Println("Table \"experiment_equipment\" was created successfully.")
 }
 
 func main() {
@@ -95,11 +95,13 @@ func main() {
 	// --- 
 
 	// -- Создаем ручку и подключение к http серверу и связываем все это между собой. --
-	// TODO: сделать ручки для остальных таблиц.
-	// NOTE: Я думаю, что для ExperimentEquipment мне не нужен отдельный handler,
-	// а можно использовать вложенные маршруты. 
+	// TODO: Если я захочу реализовать метод ListExperiments(equipmentId), то мне нужно будет передавать еще и sqliteExperimentStore для доступа к методам.
+	// С другой стороны, зачем мне вообще передавать их в ручку? Я могу просто напрямую запрос написать.
+	// Т.к доступ к базе данных есть. Так у меня получается мега тупая инкапсуляция какая-то. Я бы от этого избавился.
 	equipmentHandler := handler.NewEquipmentHandler(sqliteEquipmentStore)
-	experimentHandler := handler.NewExperimentHandler(sqliteExperimentStore, sqliteExperimentEquipmentStore)
+	experimentHandler := handler.NewExperimentHandler(sqliteExperimentStore, 
+	                                                  sqliteEquipmentStore, 
+													  sqliteExperimentEquipmentStore)
 
 	mux := http.NewServeMux()
 	

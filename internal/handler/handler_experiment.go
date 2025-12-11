@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"encoding/json"
 	"log"
+	"strings"
 	"strconv"
 
 	"go_rest_crud/internal/repo"
@@ -22,12 +23,17 @@ var (
 
 // Ручка для сущности Equipment.
 type ExperimentHandler struct {
+	// TODO: Слишком большие названия. Не лучше ли сделать сокращения EStore, EXStore и EEStore????
 	ExperimentStore               repo.ExperimentStore
+	EquipmentStore                repo.EquipmentStore
 	ExperimentEquipmentStore      repo.ExperimentEquipmentStore
 }
 
 // Конструктор для ручки Experiment.
-func NewExperimentHandler(experimentStore repo.ExperimentStore, experimentEquipmentStore repo.ExperimentEquipmentStore) *ExperimentHandler {
+func NewExperimentHandler(experimentStore repo.ExperimentStore, 
+                          equipmentStore repo.EquipmentStore,
+                          experimentEquipmentStore repo.ExperimentEquipmentStore,
+					      ) *ExperimentHandler {
 	return &ExperimentHandler {
 		ExperimentStore: experimentStore,
 		ExperimentEquipmentStore: experimentEquipmentStore, 
@@ -171,19 +177,60 @@ func (h *ExperimentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 // Добавление оборудование к эксперименту. 
 func (h *ExperimentHandler) AddEquipment(w http.ResponseWriter, r *http.Request) {
-}
+	parts := strings.Split(r.URL.Path, "/")
+	if len(parts) < 3 {
+		http.Error(w, "Invalid URL", http.StatusBadRequest)
+		return
+	}
 
-// Удаление оборудования из эксперимента
-func (h *ExperimentHandler) DeleteEquipment(w http.ResponseWriter, r *http.Request) {
+	// Получаем id эксперемента из url, куда мы будет добавлять оборудование.
+	experimentID, err := strconv.Atoi(parts[2])
+	if err != nil {
+		http.Error(w, "Invalid experiment ID", http.StatusBadRequest)
+		return
+	}
+
+	// Ищем оборудование по полученному из запроса id.
+	var payload struct {
+        EquipmentID int `json:"equipment_id"`
+	}
+	err = json.NewDecoder(r.Body).Decode(&payload)
+	if err != nil {
+		log.Fatal("Cant get json body: ", err)
+	}
+
+	equipment, err := h.EquipmentStore.Get(payload.EquipmentID)
+	if err != nil {
+		NotFoundHandler(w, r)
+		return
+	}
+
+	// Устанавливаем связь между экспериментом и оборудованием.
+	err = h.ExperimentEquipmentStore.Add(experimentID, equipment.ID)
+	if err != nil {
+        http.Error(w, "Failed to add equipment to experiment", http.StatusInternalServerError)
+        return
+	}
+
+	// TODO: возможно стоит лучше поставить http.StatusCreated.
+    w.WriteHeader(http.StatusCreated)
 }
 
 // Получения списка всего оборудования, которое используется в эксперименте.
 func (h *ExperimentHandler) ListEquipment(w http.ResponseWriter, r *http.Request) {
 }
 
-// Функция для получения списка всех экспериментов, где используется это оборудование.
-func (h *ExperimentHandler) ListExperiments(w http.ResponseWriter, r *http.Request) {
+func (h *ExperimentHandler) GetEquipment(w http.ResponseWriter, r *http.Request) {
 }
+
+// Удаление оборудования из эксперимента
+func (h *ExperimentHandler) DeleteEquipment(w http.ResponseWriter, r *http.Request) {
+}
+
+// Функция для получения списка всех экспериментов, где используется это оборудование.
+// NOTE: нигде не использутся.
+//func (h *ExperimentHandler) ListExperiments(w http.ResponseWriter, r *http.Request) {
+//}
 
 func (h *ExperimentHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
@@ -218,6 +265,9 @@ func (h *ExperimentHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 //	case r.Method == http.MethodGet && ExperimentEquipmentRe.MatchString(r.URL.Path):
 //		h.ListExperiments(w, r)
 //		return
+	case r.Method == http.MethodGet && ExperimentEquipmentReWithID.MatchString(r.URL.Path):
+		h.GetEquipment(w, r)
+		return 
 	case r.Method == http.MethodDelete && ExperimentEquipmentReWithID.MatchString(r.URL.Path):
 		h.DeleteEquipment(w, r)
 		return

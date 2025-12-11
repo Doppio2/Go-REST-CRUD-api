@@ -35,7 +35,8 @@ type ExperimentStore interface {
 type ExperimentEquipmentStore interface {
 	Add(experimentId int , equipmentId int) error
     Remove(experimentId int, equipmentId int) error
+	GetEquipment(experimentId int, equipmentId int) (entity.Equipment, error)
     ListEquipment(experimentId int) (map[int]entity.Equipment, error)
 	// NOTE: пока что это нигде не используется. И не думаю, что я придумаю, как это использовать.
-	ListExperiments(equipmentId int) (map[int]entity.Experiment, error)
+	//ListExperiments(equipmentId int) (map[int]entity.Experiment, error)
 }
