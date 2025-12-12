@@ -1,222 +1,321 @@
-package handler
+package handler_test
 
 import (
-	"testing"
-	"net/http/httptest"
-	"net/http"
-	"io"
-	"os"
 	"bytes"
 	"database/sql"
-	"log"
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"testing"
 
-    _ "github.com/glebarez/go-sqlite"
+	_ "github.com/glebarez/go-sqlite"
 	"github.com/stretchr/testify/assert"
-	"github.com/gosimple/slug"
 
-	"go_rest_crud/internal/repo"
+	"go_rest_crud/internal/entity"
+	"go_rest_crud/internal/handler"
+	"go_rest_crud/internal/repo/sqlite"
 )
 
-// Функция для тестов. Читает тестовый набор данных.
-func readTestData(t *testing.T, name string) []byte {
-    t.Helper()
-    content, err := os.ReadFile("testdata/" + name)
-    if err != nil {
-        t.Errorf("Could not read %v", name)
-    }
+// TODO: Написать тесты лучше. Сейчас они не работают.
 
-    return content
+// ErrorResponse используется для десериализации ответа об ошибке из handler_error.go
+type ErrorResponse struct {
+	Message string `json:"message"`
 }
 
-// Функция для тестов. Инициализирует sqlite.
-func InitSqliteTest() *repo.SQLiteStore {
-	// TODO: Позже нужно будет создавать файл с бд.
-	// Пока что я использую :memory параметр, что хранит всю бд в оперативной памяти.
-	// sql.Open("sqlite", "db/equipment.db")
-	// sql.Open("sqlite", "db/equipment.db")
+// ====================================================================================================
+//                                    НАСТРОЙКА ИНТЕГРАЦИОННОЙ СРЕДЫ
+// ====================================================================================================
+
+// setupTestDB создает in-memory SQLite DB, инициализирует необходимые таблицы
+// и настраивает роутинг в точности как в вашем main-файле.
+func setupTestDB(t *testing.T) (*sql.DB, *http.ServeMux) {
 	db, err := sql.Open("sqlite", ":memory:")
-	if err != nil {
-		log.Fatal("Can't connect to a data base: ", err)
-	}
-    fmt.Println("Connected to the SQLite database successfully.")
+	assert.NoError(t, err)
 
-	s := repo.NewSQLiteStore(db)
+	// Создание таблиц (минимальная реализация CreateTables для тестов)
+	_, err = db.Exec(`
+	    CREATE TABLE equipment (
+	        id INTEGER PRIMARY KEY AUTOINCREMENT,
+	        name TEXT NOT NULL,
+	        description TEXT
+	    );
+	    CREATE TABLE experiment (
+	        id INTEGER PRIMARY KEY AUTOINCREMENT,
+	        name TEXT NOT NULL,
+	        description TEXT
+	    );
+	    CREATE TABLE experiment_equipment (
+	        experiment_id INTEGER,
+	        equipment_id INTEGER,
+	        PRIMARY KEY (experiment_id, equipment_id),
+	        FOREIGN KEY (experiment_id) REFERENCES experiment(id) ON DELETE CASCADE,
+	        FOREIGN KEY (equipment_id) REFERENCES equipment(id) ON DELETE CASCADE
+	    );
+	`)
+	assert.NoError(t, err)
 
-	return s
+	// Инициализация хранилищ
+	equipmentStore := sqlite.NewSQLiteEquipmentStore(db)
+	experimentStore := sqlite.NewSQLiteExperimentStore(db)
+	experimentEquipmentStore := sqlite.NewSQLiteExperimentEquipmentStore(db)
+
+	// Инициализация хэндлеров
+	equipmentHandler := handler.NewEquipmentHandler(equipmentStore)
+	experimentHandler := handler.NewExperimentHandler(
+		experimentStore,
+		equipmentStore,
+		experimentEquipmentStore,
+	)
+
+	// Настройка роутера, полностью имитирующая ваш main-файл
+	mux := http.NewServeMux()
+
+	mux.Handle("/", &handler.HomeHandler{})
+	
+	// Оборудование
+	mux.Handle("/equipment", equipmentHandler)
+	mux.Handle("/equipment/", equipmentHandler) // Для GET/PUT/DELETE /equipment/{id}
+
+	// Эксперименты (и M2M)
+	mux.Handle("/experiments", experimentHandler) // List/Create (хотя /experiments не совпадает с ExperimentRe)
+	mux.Handle("/experiment/", experimentHandler) // Для GET/PUT/DELETE /experiment/{id} и M2M операции
+	
+	return db, mux
 }
 
-// TODO: Нужно вынести эту функцию в отдельный пакет какой-то.
-// Функция для тестов. Создаем таблицу equipment для тестирования работоспособности.
-func CreateTables(db *sql.DB) {
-	// Таблица для оборудования.
-	sqlCreateTable := `
-	CREATE TABLE IF NOT EXISTS equipment (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		name TEXT NOT NULL,
-		description TEXT
-	);`
-	_, err := db.Exec(sqlCreateTable)
-	if err != nil {
-		log.Fatal("Can't create table \"equipment\": ", err)
-	}
-	fmt.Println("Table \"equipment\" was created successfully.")
-
-	// Таблица для эксперимента.
-	sqlCreateTable = `
-	CREATE TABLE IF NOT EXISTS experiment (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		name TEXT NOT NULL,
-		description TEXT
-	);`
-	_, err = db.Exec(sqlCreateTable)
-	if err != nil {
-		log.Fatal("Can't create table experiment: ", err)
-	}
-	fmt.Println("Table \"experiment\" was created successfully.")
-
-	// Объединенная таблица.
-	sqlCreateTable = `
-	CREATE TABLE IF NOT EXISTS equipment_experiment (
-		experiment_id INTEGER NOT NULL,
-		equipment_id INTEGER NOT NULL,
-		PRIMARY KEY (experiment_id, equipment_id),
-		FOREIGN KEY (experiment_id) REFERENCES experiment(id),
-		FOREIGN KEY (equipment_id) REFERENCES equipment(id)
-	);`
-	_, err = db.Exec(sqlCreateTable)
-	if err != nil {
-		log.Fatal("Can't create table equipment_experiment: ", err)
-	}
-	fmt.Println("Table \"equipment_experiment\" was created successfully.")
+// readTestData читает JSON-файл из папки testdata.
+func readTestData(t *testing.T, filename string) []byte {
+	t.Helper()
+	data, err := os.ReadFile("testdata/" + filename)
+	assert.NoError(t, err, "Не удалось прочитать файл %s. Убедитесь, что папка 'testdata' существует и содержит файл.", filename)
+	return data
 }
 
-// Функция для тестов. Основная тестирующая функция, которая проверяет работоспособность всего веб-приложения.
-// TODO: Переписать тесты.
+// executeRequest - вспомогательная функция для выполнения HTTP-запроса
+func executeRequest(r *http.ServeMux, req *http.Request) *httptest.ResponseRecorder {
+	rr := httptest.NewRecorder()
+	r.ServeHTTP(rr, req)
+	return rr
+}
+
+// ====================================================================================================
+//                                     ТЕСТЫ ДЛЯ EQUIPMENT
+// ====================================================================================================
+
 func TestEquipmentHandlerCRUD_Integration(t *testing.T) {
-	db, err := sql.Open("sqlite", ":memory:")
-	if err != nil {
-		log.Fatal("Can't connect to a data base: ", err)
-	}
+	db, mux := setupTestDB(t)
 	defer db.Close()
-    fmt.Println("Connected to the SQLite database successfully.")
 
-	CreateTables(db);
+	var createdID int
 
-	sqliteEquipmentStore := sqlite.NewSQLiteEquipmentStore(db)
-	equipmentHandler = NewEquipmentHandler(sqliteEquipmentStore);
+	// 1. POST /equipment (Create/Add)
+	t.Run("Equipment_Create_Success", func(t *testing.T) {
+		payload := readTestData(t, "new_equipment.json")
+		req, _ := http.NewRequest("POST", "/equipment", bytes.NewBuffer(payload))
+		req.Header.Set("Content-Type", "application/json")
+		rr := executeRequest(mux, req)
 
-	testData1 := readTestData(t, "spectrophotometer.json")
-	testData2 := readTestData(t, "high_speed_centrifuge.json")
-	testData1Reader := bytes.NewReader(testData1)
-	testData2Reader := bytes.NewReader(testData2)
+		assert.Equal(t, http.StatusCreated, rr.Code)
 
-	// -- CREATE: POST /equipment --
-	r := httptest.NewRequest(http.MethodPost, "/equipment", testData1Reader)
-	w := httptest.NewRecorder()
-	
-	/*
-	sqliteStore := InitSqliteTest()
-	SQLiteCreateEquipmentTableTest(sqliteStore)
-	defer sqliteStore.Close()
-	
-	// --- Test table schema ---
-	fmt.Println("Schema of table equipment: ")
-	sqliteStore.PrintDBSchema()
+		var eq entity.Equipment
+		err := json.Unmarshal(rr.Body.Bytes(), &eq)
+		assert.NoError(t, err)
+		assert.True(t, eq.ID > 0, "Ожидался ID")
+		createdID = eq.ID // Сохраняем ID
+	})
 
-	equipmentHandler := NewEquipmentHandler(sqliteStore)
+	// 2. GET /equipment/{id} (Read/Get)
+	t.Run("Equipment_Get_Success", func(t *testing.T) {
+		url := fmt.Sprintf("/equipment/%d", createdID)
+		req, _ := http.NewRequest("GET", url, nil)
+		rr := executeRequest(mux, req)
 
-	equipmentTestData1 := readTestData(t, "spectrophotometer.json")
-	equipmentTestDataReader1 := bytes.NewReader(equipmentTestData1)
+		assert.Equal(t, http.StatusOK, rr.Code)
 
-	equipmentTestData2 := readTestData(t, "high_speed_centrifuge.json")
-	//equipmentTestDataReader2 := bytes.NewReader(equipmentTestData2)
+		var eq entity.Equipment
+		err := json.Unmarshal(rr.Body.Bytes(), &eq)
+		assert.NoError(t, err)
+		assert.Equal(t, createdID, eq.ID)
+	})
 
-	// --- CREATE: POST /equipment ---
-	r := httptest.NewRequest(http.MethodPost, "/equipment", equipmentTestDataReader1)
-	w := httptest.NewRecorder()
-	equipmentHandler.ServeHTTP(w, r)
+	t.Run("Equipment_Get_NotFound", func(t *testing.T) {
+		url := "/equipment/9999" // Несуществующий ID
+		req, _ := http.NewRequest("GET", url, nil)
+		rr := executeRequest(mux, req)
 
-	res := w.Result()
-	defer res.Body.Close()
-	assert.Equal(t, http.StatusOK, res.StatusCode)
+		assert.Equal(t, http.StatusNotFound, rr.Code)
+	})
 
-	saved, _ := sqliteStore.List()
-	assert.Len(t, saved, 1)
+	// 3. PUT /equipment/{id} (Update)
+	t.Run("Equipment_Update_Success", func(t *testing.T) {
+		payload := readTestData(t, "update_equipment.json")
+		url := fmt.Sprintf("/equipment/%d", createdID)
+		req, _ := http.NewRequest("PUT", url, bytes.NewBuffer(payload))
+		req.Header.Set("Content-Type", "application/json")
+		rr := executeRequest(mux, req)
 
-	createdSlug := slug.Make("Spectrophotometer") // "spectrophotometer"
+		assert.Equal(t, http.StatusOK, rr.Code)
+	})
 
-	// --- LIST: GET /equipment/ ---
-	r = httptest.NewRequest(http.MethodGet, "/equipment/", nil)
-	w = httptest.NewRecorder()
-	equipmentHandler.ServeHTTP(w, r)
+	// 4. GET /equipment (List)
+	t.Run("Equipment_List_Success", func(t *testing.T) {
+		reqList, _ := http.NewRequest("GET", "/equipment", nil)
+		rr := executeRequest(mux, reqList)
 
-	res = w.Result()
-	defer res.Body.Close()
-	assert.Equal(t, http.StatusOK, res.StatusCode)
+		assert.Equal(t, http.StatusOK, rr.Code)
 
-	data, err := io.ReadAll(res.Body)
-	assert.NoError(t, err)
+		var list map[string]entity.Equipment
+		err := json.Unmarshal(rr.Body.Bytes(), &list)
+		assert.NoError(t, err)
+		assert.Len(t, list, 1)
+	})
 
-	// Correction for handler_equipment_test.go:105:
-	// The expected JSON must include "id":1 (since ID is not zero) and use the slug for "name".
-	expectedList := fmt.Sprintf(`[{"id":1,"name":"%s","field":"Chemistry / Biochemistry"}]`, createdSlug)
-	assert.JSONEq(t, expectedList, string(data))
+	// 5. DELETE /equipment/{id} (Remove)
+	t.Run("Equipment_Remove_Success", func(t *testing.T) {
+		url := fmt.Sprintf("/equipment/%d", createdID)
+		req, _ := http.NewRequest("DELETE", url, nil)
+		rr := executeRequest(mux, req)
 
-	// --- UPDATE: PUT /equipment/spectrophotometer ---
-	// Сброс ридера для повторного чтения equipmentTestData2
-	// Важно: в тесте был вызов Reset() для *bytes.Reader, но если ридер был исчерпан,
-	// необходимо убедиться, что он сброшен корректно.
-	// Лучше создать новый ридер, чтобы избежать проблем с состоянием.
-	equipmentTestDataReaderForUpdate := bytes.NewReader(equipmentTestData2)
-	
-	r = httptest.NewRequest(http.MethodPut, "/equipment/"+createdSlug, equipmentTestDataReaderForUpdate)
-	w = httptest.NewRecorder()
-	equipmentHandler.ServeHTTP(w, r)
+		// Ваша реализация Delete в handler_equipment.go возвращает 500, если store.Remove() 
+		// возвращает ошибку (например, NotFoundErr), что не совсем соответствует RESTful стандартам (204 No Content).
+		// Однако, если удаление успешно, ожидаем 204.
+		assert.Equal(t, http.StatusNoContent, rr.Code)
 
-	res = w.Result()
-	defer res.Body.Close()
-	// Проверка статуса: должен быть 200 OK при успешном обновлении
-	assert.Equal(t, http.StatusOK, res.StatusCode) 
-
-	// New slug after update (e.g., "high-speed-centrifuge"), used for subsequent GET/DELETE
-	newSlug := slug.Make("High-Speed Centrifuge")
-
-	// Correction for handler_equipment_test.go:123: Get must use the new slug, as the key in the DB was updated
-	updatedEquipment, err := sqliteStore.Get(newSlug)
-	assert.NoError(t, err)
-	// Correction: The stored Name is the slug
-	assert.Equal(t, newSlug, updatedEquipment.Name)
-	assert.Equal(t, "Biology / Molecular Genetics", updatedEquipment.Field)
-
-	// --- DELETE: DELETE /equipment/spectrophotometer ---
-	// Correction for handler_equipment_test.go:135: Delete must use the new slug
-	r = httptest.NewRequest(http.MethodDelete, "/equipment/"+newSlug, nil)
-	w = httptest.NewRecorder()
-	equipmentHandler.ServeHTTP(w, r)
-
-	res = w.Result()
-	defer res.Body.Close()
-	// Ожидаемый статус: 204 No Content
-	assert.Equal(t, http.StatusNoContent, res.StatusCode) // ← Ожидаем 204
-
-	savedAfterDelete, _ := sqliteStore.List()
-	// Ожидаем 0 элементов после удаления
-	assert.Len(t, savedAfterDelete, 0)
-	*/
+		// Проверяем, что запись действительно удалена
+		reqGet, _ := http.NewRequest("GET", url, nil)
+		rrGet := executeRequest(mux, reqGet)
+		assert.Equal(t, http.StatusNotFound, rrGet.Code)
+	})
 }
+
+// ====================================================================================================
+//                             ТЕСТЫ ДЛЯ EXPERIMENT (CRUD & M2M)
+// ====================================================================================================
 
 func TestExperimentHandlerCRUD_Integration(t *testing.T) {
-	db, err := sql.Open("sqlite", ":memory:")
-	if err != nil {
-		log.Fatal("Can't connect to a data base: ", err)
-	}
+	db, mux := setupTestDB(t)
 	defer db.Close()
-    fmt.Println("Connected to the SQLite database successfully.")
 
-	CreateTables(db);
+	var expID int // ID для эксперимента
+	var eqID1 int // ID для первого оборудования
+	var eqID2 int // ID для второго оборудования
 
-	sqliteEquipmentStore := sqlite.NewSQLiteEquipmentStore(db)
-	sqliteExperimentStore := sqlite.NewSQLiteExperimentStore(db)
-	sqliteExperimentEquipmentStore := sqlite.NewSQLiteExperimentEquipmentStore(db)
+	// 1. SETUP: Создание Эксперимента и Оборудования для M2M тестов
+	t.Run("Setup_Entities", func(t *testing.T) {
+		// 1.1 Создание Эксперимента (POST /experiment)
+		expPayload := readTestData(t, "new_experiment.json")
+		reqExp, _ := http.NewRequest("POST", "/experiment", bytes.NewBuffer(expPayload))
+		reqExp.Header.Set("Content-Type", "application/json")
+		rrExp := executeRequest(mux, reqExp)
+		assert.Equal(t, http.StatusCreated, rrExp.Code)
+		var exp entity.Experiment
+		json.Unmarshal(rrExp.Body.Bytes(), &exp)
+		expID = exp.ID
+
+		// 1.2 Создание Оборудования 1 (POST /equipment)
+		eqPayload1 := readTestData(t, "new_equipment.json")
+		reqEq1, _ := http.NewRequest("POST", "/equipment", bytes.NewBuffer(eqPayload1))
+		reqEq1.Header.Set("Content-Type", "application/json")
+		rrEq1 := executeRequest(mux, reqEq1)
+		assert.Equal(t, http.StatusCreated, rrEq1.Code)
+		var eq1 entity.Equipment
+		json.Unmarshal(rrEq1.Body.Bytes(), &eq1)
+		eqID1 = eq1.ID
+
+		// 1.3 Создание Оборудования 2
+		eqPayload2 := []byte(`{"name": "Laser", "description": "High-power beam"}`)
+		reqEq2, _ := http.NewRequest("POST", "/equipment", bytes.NewBuffer(eqPayload2))
+		reqEq2.Header.Set("Content-Type", "application/json")
+		rrEq2 := executeRequest(mux, reqEq2)
+		assert.Equal(t, http.StatusCreated, rrEq2.Code)
+		var eq2 entity.Equipment
+		json.Unmarshal(rrEq2.Body.Bytes(), &eq2)
+		eqID2 = eq2.ID
+	})
+	
+	// 2. M2M: POST /experiment/{id}/equipment (Add Equipment)
+	t.Run("M2M_AddEquipment_Success", func(t *testing.T) {
+		url := fmt.Sprintf("/experiment/%d/equipment", expID)
+
+		// 2.1 Добавление Оборудования 1
+		payload1 := fmt.Sprintf(`{"equipment_id": %d}`, eqID1)
+		req1, _ := http.NewRequest("POST", url, bytes.NewBufferString(payload1))
+		req1.Header.Set("Content-Type", "application/json")
+		rr1 := executeRequest(mux, req1)
+		assert.Equal(t, http.StatusCreated, rr1.Code, "Добавление первого оборудования должно быть успешным")
+
+		// 2.2 Добавление Оборудования 2
+		payload2 := fmt.Sprintf(`{"equipment_id": %d}`, eqID2)
+		req2, _ := http.NewRequest("POST", url, bytes.NewBufferString(payload2))
+		req2.Header.Set("Content-Type", "application/json")
+		rr2 := executeRequest(mux, req2)
+		assert.Equal(t, http.StatusCreated, rr2.Code, "Добавление второго оборудования должно быть успешным")
+	})
+
+	// 3. M2M: GET /experiment/{id}/equipment (List Equipment)
+	t.Run("M2M_ListEquipment_Success", func(t *testing.T) {
+		url := fmt.Sprintf("/experiment/%d/equipment", expID)
+		req, _ := http.NewRequest("GET", url, nil)
+		rr := executeRequest(mux, req)
+
+		assert.Equal(t, http.StatusOK, rr.Code)
+
+		var list map[string]entity.Equipment
+		err := json.Unmarshal(rr.Body.Bytes(), &list)
+		assert.NoError(t, err)
+		assert.Len(t, list, 2, "Должно быть два прикрепленных оборудования")
+	})
+	
+	// 4. M2M: DELETE /experiment/{id}/equipment/{equipment_id} (Remove Equipment)
+	t.Run("M2M_RemoveEquipment_Success", func(t *testing.T) {
+		url := fmt.Sprintf("/experiment/%d/equipment/%d", expID, eqID1)
+		req, _ := http.NewRequest("DELETE", url, nil)
+		rr := executeRequest(mux, req)
+		// handler_experiment.go:RemoveEquipment возвращает 204 No Content
+		assert.Equal(t, http.StatusNoContent, rr.Code, "Удаление связи должно быть успешным")
+
+		// Проверка, что осталось только одно оборудование
+		listURL := fmt.Sprintf("/experiment/%d/equipment", expID)
+		reqList, _ := http.NewRequest("GET", listURL, nil)
+		rrList := executeRequest(mux, reqList)
+
+		var list map[string]entity.Equipment
+		json.Unmarshal(rrList.Body.Bytes(), &list)
+		assert.Len(t, list, 1, "После удаления должен остаться только один элемент")
+	})
+
+	t.Run("M2M_RemoveEquipment_NotFound", func(t *testing.T) {
+		// Попытка удалить уже удаленную связь (eqID1)
+		url := fmt.Sprintf("/experiment/%d/equipment/%d", expID, eqID1)
+		req, _ := http.NewRequest("DELETE", url, nil)
+		rr := executeRequest(mux, req)
+		assert.Equal(t, http.StatusNotFound, rr.Code, "Попытка удалить несуществующую связь должна вернуть 404")
+	})
+
+	// 5. Experiment CRUD (Проверка Get и Delete самого эксперимента)
+	t.Run("Experiment_Get_Success", func(t *testing.T) {
+		url := fmt.Sprintf("/experiment/%d", expID)
+		req, _ := http.NewRequest("GET", url, nil)
+		rr := executeRequest(mux, req)
+		assert.Equal(t, http.StatusOK, rr.Code)
+	})
+
+	t.Run("Experiment_Remove_Success_Cascades", func(t *testing.T) {
+		// Удаляем сам эксперимент
+		deleteURL := fmt.Sprintf("/experiment/%d", expID)
+		reqDelete, _ := http.NewRequest("DELETE", deleteURL, nil)
+		rrDelete := executeRequest(mux, reqDelete)
+		assert.Equal(t, http.StatusNoContent, rrDelete.Code)
+
+		// Проверяем, что эксперимент удален
+		reqGet, _ := http.NewRequest("GET", deleteURL, nil)
+		rrGet := executeRequest(mux, reqGet)
+		assert.Equal(t, http.StatusNotFound, rrGet.Code)
+		
+		// NOTE: Каскадное удаление связи (ExperimentEquipment) не проверяется 
+		// напрямую через API, но оно должно произойти на уровне БД.
+	})
 }
