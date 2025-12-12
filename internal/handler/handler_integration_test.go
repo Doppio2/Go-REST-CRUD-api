@@ -18,7 +18,9 @@ import (
 	"go_rest_crud/internal/repo/sqlite"
 )
 
-// TODO: Написать тесты лучше. Сейчас они не работают.
+// TODO: Переписать тесты нормально. 
+// Сейчас это нейро-слоп. Хотя мб и заработает.
+// Но мне кажется проще тесты самому написать.
 
 // ErrorResponse используется для десериализации ответа об ошибке из handler_error.go
 type ErrorResponse struct {
@@ -160,6 +162,7 @@ func TestEquipmentHandlerCRUD_Integration(t *testing.T) {
 		assert.Equal(t, http.StatusOK, rr.Code)
 	})
 
+	// FIXME: тесты сейчас не работают.
 	// 4. GET /equipment (List)
 	t.Run("Equipment_List_Success", func(t *testing.T) {
 		reqList, _ := http.NewRequest("GET", "/equipment", nil)

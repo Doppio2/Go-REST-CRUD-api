@@ -44,7 +44,7 @@ func (h *EquipmentHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return 
 	}
 
-	err = h.store.Add(equipment)
+	id, err := h.store.Add(equipment)
 	if err != nil {
 		// TODO: Log later.
 		// TODO: Pass errors to the InternalServerErorHandler function.
@@ -53,7 +53,11 @@ func (h *EquipmentHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
+	equipment.ID = id
+
+	w.WriteHeader(http.StatusCreated)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(equipment)
 }
 
 // Получение всех записей из бд.

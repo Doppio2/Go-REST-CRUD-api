@@ -43,10 +43,21 @@ func (store *SQLiteEquipmentStore) PrintDBSchema() {
 	}
 }
 
-func (s *SQLiteEquipmentStore) Add(e entity.Equipment) error {
+func (s *SQLiteEquipmentStore) Add(e entity.Equipment) (int, error) {
     query := "INSERT INTO equipment (name, description) VALUES (?, ?)"
-    _, err := s.Exec(query, e.Name, e.Description)
-    return err
+
+	// Используем res для получения LastInsertID.
+	res, err := s.Exec(query, e.Name, e.Description) 
+	if err != nil {
+		return 0, err
+	}
+
+	id, err := res.LastInsertId()
+	if err != nil {
+		return 0, err
+	}
+
+	return int(id), nil // Возвращаем ID
 }
 
 // Стоит ли назвать функцию GetById, а не просто Get???? Не знаю пока. Если других фукнция не планируется, мб и не стоит.

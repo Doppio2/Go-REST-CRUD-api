@@ -17,7 +17,7 @@ var (
 // TODO: во всех методах с List() я получаю все как map[int]'Entity'. 
 // Если честно это выглядит каким-то избытком, но пока лучше оставлю. Не очень хочется щас это менять. Но мб стоит.
 type EquipmentStore interface {
-    Add(equipment entity.Equipment) error
+    Add(equipment entity.Equipment) (int, error)
     Get(id int) (entity.Equipment, error)
     Update(id int, equipment entity.Equipment) error
     List() (map[int]entity.Equipment, error)

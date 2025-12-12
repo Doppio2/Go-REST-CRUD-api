@@ -99,7 +99,7 @@ func (h *ExperimentHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
+	w.WriteHeader(http.StatusCreated)
 }
 
 func (h *ExperimentHandler) List(w http.ResponseWriter, r *http.Request) {
