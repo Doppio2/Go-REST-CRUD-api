@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
 	"regexp"
 	"encoding/json"
@@ -72,6 +73,7 @@ func NewExperimentHandler(experimentStore repo.ExperimentStore,
 					      ) *ExperimentHandler {
 	return &ExperimentHandler {
 		ExperimentStore: experimentStore,
+		EquipmentStore: equipmentStore,
 		ExperimentEquipmentStore: experimentEquipmentStore, 
 	}
 }
@@ -91,7 +93,7 @@ func (h *ExperimentHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return 
 	}
 
-	err = h.ExperimentStore.Add(experiment)
+	id, err := h.ExperimentStore.Add(experiment)
 	if err != nil {
 		// TODO: Pass errors to the InternalServerErorHandler function.
 		log.Fatal("Can not add experiment to the database", err)
@@ -99,7 +101,11 @@ func (h *ExperimentHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(http.StatusCreated)
+	experiment.ID = id
+
+	w.Header().Set("Content-Type", "application/json") // <-- Сначала заголовки
+	w.WriteHeader(http.StatusCreated)                 // <-- Потом статус
+	json.NewEncoder(w).Encode(experiment)
 }
 
 func (h *ExperimentHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -228,11 +234,13 @@ func (h *ExperimentHandler) AddEquipment(w http.ResponseWriter, r *http.Request)
 		log.Fatal("Cant get json body: ", err)
 	}
 
+	fmt.Printf("Где-то здесь паника\n")
 	equipment, err := h.EquipmentStore.Get(payload.EquipmentID)
 	if err != nil {
 		NotFoundHandler(w, r)
 		return
 	}
+	fmt.Printf("Где-то здесь паника\n")
 
 	// Устанавливаем связь между экспериментом и оборудованием.
 	err = h.ExperimentEquipmentStore.Add(experimentID, equipment.ID)
@@ -315,7 +323,13 @@ func (h *ExperimentHandler) DeleteEquipment(w http.ResponseWriter, r *http.Reque
 
 	err = h.ExperimentEquipmentStore.Remove(experimentID, equipmentID)
 
-	if err != nil {
+	if err == repo.NotFoundErr { // <-- 1. Сначала проверяем 404
+		http.Error(w, "Experiment equipment link not found", http.StatusNotFound)
+		return
+	}
+
+	if err != nil { // <-- 2. Затем проверяем другие ошибки (500)
+		// Используйте InternalServerErrorHandler или явно 500
 		http.Error(w, "Failed to delete equipment from experiment", http.StatusInternalServerError)
 		return
 	}
@@ -337,13 +351,13 @@ func (h *ExperimentHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case r.Method == http.MethodGet && ExperimentRe.MatchString(r.URL.Path):
 		h.List(w, r)
 		return
-	case r.Method == http.MethodGet && EquipmentReWithID.MatchString(r.URL.Path):
+	case r.Method == http.MethodGet && ExperimentReWithID.MatchString(r.URL.Path):
 		h.Get(w, r)
 		return
-	case r.Method == http.MethodPut && EquipmentReWithID.MatchString(r.URL.Path):
+	case r.Method == http.MethodPut && ExperimentReWithID.MatchString(r.URL.Path):
 		h.Update(w, r)
 		return
-	case r.Method == http.MethodDelete && EquipmentReWithID.MatchString(r.URL.Path):
+	case r.Method == http.MethodDelete && ExperimentReWithID.MatchString(r.URL.Path):
 		h.Delete(w, r)
 		return
 		// TODO: Добавить метод GetEquipment.

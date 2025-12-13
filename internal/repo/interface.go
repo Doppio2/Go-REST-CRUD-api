@@ -25,7 +25,7 @@ type EquipmentStore interface {
 }
 
 type ExperimentStore interface {
-    Add(equipment entity.Experiment) error
+    Add(equipment entity.Experiment) (int, error)
     Get(id int) (entity.Experiment, error)
     Update(id int, equipment entity.Experiment) error
     List() (map[int]entity.Experiment, error)

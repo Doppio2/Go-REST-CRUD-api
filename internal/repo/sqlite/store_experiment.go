@@ -23,10 +23,20 @@ func NewSQLiteExperimentStore(db *sql.DB) *SQLiteExperimentStore {
 	}
 }
 
-func (s *SQLiteExperimentStore) Add(ex entity.Experiment) error {
+func (s *SQLiteExperimentStore) Add(ex entity.Experiment) (int, error) {
     query := "INSERT INTO experiment (name, description) VALUES (?, ?)"
-    _, err := s.Exec(query, ex.Name, ex.Description)
-    return err
+	// Используем res для получения LastInsertID.
+	res, err := s.Exec(query, ex.Name, ex.Description) 
+	if err != nil {
+		return 0, err
+	}
+
+	id, err := res.LastInsertId()
+	if err != nil {
+		return 0, err
+	}
+
+	return int(id), nil // Возвращаем ID
 }
 
 func (s *SQLiteExperimentStore) Get(id int) (entity.Experiment, error) {

@@ -170,7 +170,7 @@ func TestEquipmentHandlerCRUD_Integration(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, rr.Code)
 
-		var list map[string]entity.Equipment
+		var list []entity.Equipment
 		err := json.Unmarshal(rr.Body.Bytes(), &list)
 		assert.NoError(t, err)
 		assert.Len(t, list, 1)
@@ -210,7 +210,7 @@ func TestExperimentHandlerCRUD_Integration(t *testing.T) {
 	t.Run("Setup_Entities", func(t *testing.T) {
 		// 1.1 Создание Эксперимента (POST /experiment)
 		expPayload := readTestData(t, "new_experiment.json")
-		reqExp, _ := http.NewRequest("POST", "/experiment", bytes.NewBuffer(expPayload))
+		reqExp, _ := http.NewRequest("POST", "/experiment/", bytes.NewBuffer(expPayload))
 		reqExp.Header.Set("Content-Type", "application/json")
 		rrExp := executeRequest(mux, reqExp)
 		assert.Equal(t, http.StatusCreated, rrExp.Code)
@@ -266,7 +266,7 @@ func TestExperimentHandlerCRUD_Integration(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, rr.Code)
 
-		var list map[string]entity.Equipment
+		var list []entity.Equipment
 		err := json.Unmarshal(rr.Body.Bytes(), &list)
 		assert.NoError(t, err)
 		assert.Len(t, list, 2, "Должно быть два прикрепленных оборудования")
@@ -285,8 +285,9 @@ func TestExperimentHandlerCRUD_Integration(t *testing.T) {
 		reqList, _ := http.NewRequest("GET", listURL, nil)
 		rrList := executeRequest(mux, reqList)
 
-		var list map[string]entity.Equipment
-		json.Unmarshal(rrList.Body.Bytes(), &list)
+		var list []entity.Equipment // <-- ИСПРАВЛЕНИЕ: Используйте СЛАЙС, как в M2M_ListEquipment_Success
+		err := json.Unmarshal(rrList.Body.Bytes(), &list)
+		assert.NoError(t, err) // <-- Хорошо бы добавить проверку на ошибку десериализации
 		assert.Len(t, list, 1, "После удаления должен остаться только один элемент")
 	})
 

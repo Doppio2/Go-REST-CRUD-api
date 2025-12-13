@@ -89,7 +89,7 @@ func (s *SQLiteExperimentEquipmentStore) ListEquipment(experimentId int) (map[in
 
 	for rows.Next() {
 		var e entity.Equipment
-		if err := rows.Scan(&e.ID, e.Name, e.Description); err != nil {
+		if err := rows.Scan(&e.ID, &e.Name, &e.Description); err != nil {
 			return nil, err
 		}
 		res[e.ID] = e
