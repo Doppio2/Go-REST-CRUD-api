@@ -1,7 +1,10 @@
 package sqlite
 
 import (
-//	"fmt"
+	"fmt"
+	"os"
+	"encoding/csv"
+	"strconv"
 	"database/sql"
 //	"log"
 	_ "github.com/glebarez/go-sqlite"
@@ -130,3 +133,47 @@ func (s *SQLiteExperimentEquipmentStore) ListExperiments(equipmentId int) (map[i
 	return res, nil
 }
 */
+
+// Новый метод для экспорта оборудования конкретного эксперимента в файл
+func (s *SQLiteExperimentEquipmentStore) ExportEquipmentToFile(experimentId int, filePath string) error {
+	// 1. Получаем список оборудования для этого эксперимента
+	equipmentMap, err := s.ListEquipment(experimentId)
+	if err != nil {
+		return fmt.Errorf("ошибка получения данных для эксперимента %d: %w", experimentId, err)
+	}
+
+	// 2. Создаем файл
+	file, err := os.Create(filePath)
+	if err != nil {
+		return fmt.Errorf("ошибка создания файла: %w", err)
+	}
+	defer file.Close()
+
+	// Добавляем BOM для кириллицы
+	file.WriteString("\xEF\xBB\xBF")
+
+	writer := csv.NewWriter(file)
+	writer.Comma = ';' // Для Excel
+	defer writer.Flush()
+
+	// 3. Записываем информацию о том, чей это отчет
+	writer.Write([]string{"Отчет по оборудованию для эксперимента ID:", strconv.Itoa(experimentId)})
+	writer.Write([]string{}) // Пустая строка для красоты
+
+	// 4. Заголовки таблицы
+	writer.Write([]string{"ID Оборудования", "Название", "Описание"})
+
+	// 5. Заполняем данными
+	for _, e := range equipmentMap {
+		row := []string{
+			strconv.Itoa(e.ID),
+			e.Name,
+			e.Description,
+		}
+		if err := writer.Write(row); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}

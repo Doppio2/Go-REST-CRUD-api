@@ -1,6 +1,10 @@
 package sqlite
 
 import (
+	"fmt"
+	"os"
+	"encoding/csv"
+	"strconv"
 	"database/sql"
 
 	_ "github.com/glebarez/go-sqlite"
@@ -108,4 +112,48 @@ func (s *SQLiteEquipmentStore) Remove(id int) error {
         return repo.NotFoundErr
     }
     return nil
+}
+
+func (s *SQLiteEquipmentStore) ExportAllToFile(filePath string) error {
+	// 1. Получаем данные через наш существующий метод List
+	equipmentMap, err := s.List()
+	if err != nil {
+		return fmt.Errorf("ошибка при получении данных: %v", err)
+	}
+
+	// 2. Создаем файл
+	file, err := os.Create(filePath)
+	if err != nil {
+		return fmt.Errorf("не удалось создать файл: %v", err)
+	}
+	defer file.Close()
+
+	// Добавляем BOM (Byte Order Mark) для корректного отображения кириллицы в Excel
+	file.WriteString("\xEF\xBB\xBF")
+
+	writer := csv.NewWriter(file)
+	// Устанавливаем точку с запятой как разделитель (стандарт для Excel в RU регионе)
+	writer.Comma = ';'
+	defer writer.Flush()
+
+	// 3. Записываем "шапку" таблицы
+	headers := []string{"ID", "Название", "Описание", "Дата создания"}
+	if err := writer.Write(headers); err != nil {
+		return fmt.Errorf("ошибка записи заголовков: %v", err)
+	}
+
+	// 4. Проходим по мапе и записываем строки
+	for _, e := range equipmentMap {
+		row := []string{
+			strconv.Itoa(e.ID),
+			e.Name,
+			e.Description,
+			e.CreationDate, // Удобный формат даты
+		}
+		if err := writer.Write(row); err != nil {
+			return fmt.Errorf("ошибка записи строки ID %d: %v", e.ID, err)
+		}
+	}
+
+	return nil
 }

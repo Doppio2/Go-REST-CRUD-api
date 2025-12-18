@@ -110,6 +110,16 @@ func (h *ExperimentHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ExperimentHandler) List(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Query().Get("format") == "csv" {
+		filename := "all_experiments.csv"
+		if err := h.ExperimentStore.ExportAllToFile(filename); err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		serveCSV(w, r, filename)
+		return
+	}
+
     experimentMap, err := h.ExperimentStore.List()
     if err != nil {
         InternalServerErrorHandler(w, r)
@@ -258,6 +268,19 @@ func (h *ExperimentHandler) ListEquipment(w http.ResponseWriter, r *http.Request
 	experimentID, err := GetExperimentID(w, r)
 	if err != nil {
 		http.Error(w, "Invalid experiment ID", http.StatusBadRequest)
+		return
+	}
+
+	if r.URL.Query().Get("format") == "csv" {
+		// experimentID мы уже достали из URL ранее в хэндлере
+		filename := fmt.Sprintf("experiment_%d_equipment.csv", experimentID)
+
+		// ВАЖНО: здесь метод принимает ID
+		if err := h.ExperimentEquipmentStore.ExportEquipmentToFile(experimentID, filename); err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		serveCSV(w, r, filename)
 		return
 	}
 

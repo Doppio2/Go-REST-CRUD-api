@@ -65,6 +65,16 @@ func (h *EquipmentHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 // Получение всех записей из бд.
 func (h *EquipmentHandler) List(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Query().Get("format") == "csv" {
+		filename := "all_equipment.csv"
+		if err := h.store.ExportAllToFile(filename); err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		serveCSV(w, r, filename) // Вынес отправку в отдельный метод для чистоты
+		return
+	}
+
     equipmentMap, err := h.store.List()
     if err != nil {
 		// TODO: Log later.

@@ -1,6 +1,10 @@
 package sqlite
 
 import (
+	"fmt"
+	"os"
+	"encoding/csv"
+	"strconv"
 	"database/sql"
 
 	_ "github.com/glebarez/go-sqlite"
@@ -84,4 +88,48 @@ func (s *SQLiteExperimentStore) Remove(id int) error {
         return repo.NotFoundErr
     }
     return nil
+}
+
+// ExportAllToFile для экспериментов
+func (s *SQLiteExperimentStore) ExportAllToFile(filePath string) error {
+	// 1. Получаем данные
+	experimentsMap, err := s.List()
+	if err != nil {
+		return fmt.Errorf("ошибка при получении списка экспериментов: %w", err)
+	}
+
+	// 2. Создаем файл
+	file, err := os.Create(filePath)
+	if err != nil {
+		return fmt.Errorf("не удалось создать файл: %w", err)
+	}
+	defer file.Close()
+
+	// Добавляем BOM для корректного отображения кириллицы в Excel
+	file.WriteString("\xEF\xBB\xBF")
+
+	writer := csv.NewWriter(file)
+	writer.Comma = ';' // Точка с запятой для корректного открытия в Excel (RU)
+	defer writer.Flush()
+
+	// 3. Заголовки таблицы
+	headers := []string{"ID Эксперимента", "Название", "Описание", "Дата проведения"}
+	if err := writer.Write(headers); err != nil {
+		return err
+	}
+
+	// 4. Заполнение данными
+	for _, ex := range experimentsMap {
+		row := []string{
+			strconv.Itoa(ex.ID),
+			ex.Name,
+			ex.Description,
+			ex.CreationDate, // Обычно для экспериментов достаточно даты без времени
+		}
+		if err := writer.Write(row); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

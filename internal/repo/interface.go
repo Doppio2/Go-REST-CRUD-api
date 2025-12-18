@@ -22,6 +22,7 @@ type EquipmentStore interface {
     Update(id int, equipment entity.Equipment) error
     List() (map[int]entity.Equipment, error)
     Remove(id int) error
+	ExportAllToFile(filePath string) error 
 }
 
 type ExperimentStore interface {
@@ -30,6 +31,7 @@ type ExperimentStore interface {
     Update(id int, equipment entity.Experiment) error
     List() (map[int]entity.Experiment, error)
     Remove(id int) error
+	ExportAllToFile(filePath string) error 
 }
 
 type ExperimentEquipmentStore interface {
@@ -37,6 +39,7 @@ type ExperimentEquipmentStore interface {
     Remove(experimentId int, equipmentId int) error
 	GetEquipment(experimentId int, equipmentId int) (entity.Equipment, error)
     ListEquipment(experimentId int) (map[int]entity.Equipment, error)
+	ExportEquipmentToFile(experimentId int, filePath string) error
 	// NOTE: пока что это нигде не используется. И не думаю, что я придумаю, как это использовать.
 	//ListExperiments(equipmentId int) (map[int]entity.Experiment, error)
 }
