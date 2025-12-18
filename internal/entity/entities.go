@@ -2,9 +2,10 @@ package entity
 
 // Сущность.
 type Equipment struct {
-	ID            int     `json:"id"`
+	ID            int      `json:"id"`
 	Name          string  `json:"name"`
 	Description   string  `json:"description"`
+	CreationDate  string  `json:"creation_date"`      // NOTE: лучше это хранить как time.Time, но у меня не парсится потом это все нормально, так что пусть пока будет как string.
 }
 
 // TODO: В этой сущности нужно поле с датой.
@@ -13,6 +14,7 @@ type Experiment struct {
 	ID            int     `json:"id"`
 	Name          string  `json:"name"`
 	Description   string  `json:"description"`
+	CreationDate  string  `json:"creation_date"`      // NOTE: лучше это хранить как time.Time, но у меня не парсится потом это все нормально, так что пусть пока будет как string.
 }
 
 // Здесь мб можно хранить кол-во оборудования и дату добавления последнего,

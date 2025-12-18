@@ -1,9 +1,8 @@
 package sqlite
 
 import (
-	"fmt"
 	"database/sql"
-	"log"
+
 	_ "github.com/glebarez/go-sqlite"
 
 	"go_rest_crud/internal/repo"
@@ -21,6 +20,7 @@ func NewSQLiteEquipmentStore(db *sql.DB) *SQLiteEquipmentStore {
 	}
 }
 
+/*
 func (store *SQLiteEquipmentStore) PrintDBSchema() {
 	rows, err := store.Query("PRAGMA table_info(equipment);")
 	if err != nil {
@@ -42,12 +42,13 @@ func (store *SQLiteEquipmentStore) PrintDBSchema() {
 		name, ctype, notnull, dfltValue, pk)
 	}
 }
+*/
 
 func (s *SQLiteEquipmentStore) Add(e entity.Equipment) (int, error) {
-    query := "INSERT INTO equipment (name, description) VALUES (?, ?)"
+    query := "INSERT INTO equipment (name, description, creation_date) VALUES (?, ?, ?)"
 
 	// Используем res для получения LastInsertID.
-	res, err := s.Exec(query, e.Name, e.Description) 
+	res, err := s.Exec(query, e.Name, e.Description, e.CreationDate) 
 	if err != nil {
 		return 0, err
 	}
@@ -63,8 +64,8 @@ func (s *SQLiteEquipmentStore) Add(e entity.Equipment) (int, error) {
 // Стоит ли назвать функцию GetById, а не просто Get???? Не знаю пока. Если других фукнция не планируется, мб и не стоит.
 func (s *SQLiteEquipmentStore) Get(id int) (entity.Equipment, error) {
     var e entity.Equipment
-    rows := s.QueryRow("SELECT id, name, description FROM equipment WHERE id = ?", id)
-	err := rows.Scan(&e.ID, &e.Name, &e.Description)
+    rows := s.QueryRow("SELECT id, name, description, creation_date FROM equipment WHERE id = ?", id)
+	err := rows.Scan(&e.ID, &e.Name, &e.Description, &e.CreationDate)
     if err == sql.ErrNoRows {
         return e, repo.NotFoundErr
     }
@@ -72,12 +73,14 @@ func (s *SQLiteEquipmentStore) Get(id int) (entity.Equipment, error) {
 }
 
 func (s *SQLiteEquipmentStore) Update(id int, e entity.Equipment) error {
+	// TODO: нужно ли обновлять дату создания?????
     _, err := s.Exec("UPDATE equipment SET name = ?, description = ? WHERE id = ?", e.Name, e.Description, id)
     return err
 }
 
 func (s *SQLiteEquipmentStore) List() (map[int]entity.Equipment, error) {
-    rows, err := s.Query("SELECT id, name, description FROM equipment")
+	
+    rows, err := s.Query("SELECT id, name, description, creation_date FROM equipment")
     if err != nil {
         return nil, err
     }
@@ -86,11 +89,12 @@ func (s *SQLiteEquipmentStore) List() (map[int]entity.Equipment, error) {
     result := make(map[int]entity.Equipment)
     for rows.Next() {
         var e entity.Equipment
-        if err := rows.Scan(&e.ID, &e.Name, &e.Description); err != nil {
+        if err := rows.Scan(&e.ID, &e.Name, &e.Description, &e.CreationDate); err != nil {
             return nil, err
         }
         result[e.ID] = e
     }
+
     return result, nil
 }
 

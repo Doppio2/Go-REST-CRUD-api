@@ -28,7 +28,8 @@ func CreateTables(db *sql.DB) {
 	CREATE TABLE IF NOT EXISTS equipment (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		name TEXT NOT NULL,
-		description TEXT
+		description TEXT,
+		creation_date TEXT NOT NULL
 	);`
 	_, err := db.Exec(sqlCreateTable)
 	if err != nil {
@@ -41,7 +42,8 @@ func CreateTables(db *sql.DB) {
 	CREATE TABLE IF NOT EXISTS experiment (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		name TEXT NOT NULL,
-		description TEXT
+		description TEXT,
+		creation_date TEXT NOT NULL
 	);`
 	_, err = db.Exec(sqlCreateTable)
 	if err != nil {

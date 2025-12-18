@@ -1,10 +1,8 @@
 package sqlite
 
 import (
-//	"fmt"
 	"database/sql"
-//	"log"
-//	"github.com/gosimple/slug"
+
 	_ "github.com/glebarez/go-sqlite"
 
 	"go_rest_crud/internal/repo"
@@ -24,9 +22,10 @@ func NewSQLiteExperimentStore(db *sql.DB) *SQLiteExperimentStore {
 }
 
 func (s *SQLiteExperimentStore) Add(ex entity.Experiment) (int, error) {
-    query := "INSERT INTO experiment (name, description) VALUES (?, ?)"
+    query := "INSERT INTO experiment (name, description, creation_date) VALUES (?, ?, ?)"
+
 	// Используем res для получения LastInsertID.
-	res, err := s.Exec(query, ex.Name, ex.Description) 
+	res, err := s.Exec(query, ex.Name, ex.Description, ex.CreationDate) 
 	if err != nil {
 		return 0, err
 	}
@@ -41,8 +40,8 @@ func (s *SQLiteExperimentStore) Add(ex entity.Experiment) (int, error) {
 
 func (s *SQLiteExperimentStore) Get(id int) (entity.Experiment, error) {
     var ex entity.Experiment
-    err := s.QueryRow("SELECT id, name, description FROM experiment WHERE id = ?", id).
-        Scan(&ex.ID, &ex.Name, &ex.Description)
+    err := s.QueryRow("SELECT id, name, description, creation_date FROM experiment WHERE id = ?", id).
+        Scan(&ex.ID, &ex.Name, &ex.Description, &ex.CreationDate)
     if err == sql.ErrNoRows {
         return ex, repo.NotFoundErr
     }
@@ -50,12 +49,13 @@ func (s *SQLiteExperimentStore) Get(id int) (entity.Experiment, error) {
 }
 
 func (s *SQLiteExperimentStore) Update(id int, ex entity.Experiment) error {
-    _, err := s.Exec("UPDATE experiment SET name = ?, description = ? WHERE id = ?", ex.Name, ex.Description, id)
+	// TODO: нужно ли обновлять дату создания?????
+    _, err := s.Exec("UPDATE experiment SET name = ?, description = ? WHERE id = ?", ex.Name, ex.Description, id, )
     return err
 }
 
 func (s *SQLiteExperimentStore) List() (map[int]entity.Experiment, error) {
-    rows, err := s.Query("SELECT id, name, description FROM experiment")
+    rows, err := s.Query("SELECT id, name, description, creation_date FROM experiment")
     if err != nil {
         return nil, err
     }
@@ -64,7 +64,7 @@ func (s *SQLiteExperimentStore) List() (map[int]entity.Experiment, error) {
     result := make(map[int]entity.Experiment)
     for rows.Next() {
         var ex entity.Experiment
-        if err := rows.Scan(&ex.ID, &ex.Name, &ex.Description); err != nil {
+        if err := rows.Scan(&ex.ID, &ex.Name, &ex.Description, &ex.CreationDate); err != nil {
             return nil, err
         }
         result[ex.ID] = ex

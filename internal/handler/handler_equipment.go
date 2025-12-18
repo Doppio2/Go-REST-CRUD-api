@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"time"
+	//"fmt"
 	"net/http"
 	"regexp"
 	"encoding/json"
@@ -32,9 +34,10 @@ func NewEquipmentHandler(s repo.EquipmentStore) *EquipmentHandler {
 
 // Функции обработчики запросов.
 func (h *EquipmentHandler) Create(w http.ResponseWriter, r *http.Request) {
+	// NOTE: rename to just "e".
 	var equipment entity.Equipment
-
 	err := json.NewDecoder(r.Body).Decode(&equipment)
+	equipment.CreationDate = time.Now().UTC().Format(time.RFC3339)
 
 	if err != nil {
 		// TODO: Log later.
@@ -192,6 +195,7 @@ func (h *EquipmentHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.Delete(w, r)
 		return
 	default:
+		http.NotFound(w, r)
 		return
 	}
 }

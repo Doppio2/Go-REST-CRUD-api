@@ -42,12 +42,14 @@ func setupTestDB(t *testing.T) (*sql.DB, *http.ServeMux) {
 	    CREATE TABLE equipment (
 	        id INTEGER PRIMARY KEY AUTOINCREMENT,
 	        name TEXT NOT NULL,
-	        description TEXT
+	        description TEXT,
+			creation_date TEXT NOT NULL
 	    );
 	    CREATE TABLE experiment (
 	        id INTEGER PRIMARY KEY AUTOINCREMENT,
 	        name TEXT NOT NULL,
-	        description TEXT
+	        description TEXT,
+			creation_date TEXT NOT NULL
 	    );
 	    CREATE TABLE experiment_equipment (
 	        experiment_id INTEGER,

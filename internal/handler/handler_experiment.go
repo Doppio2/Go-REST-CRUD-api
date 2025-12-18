@@ -2,6 +2,7 @@ package handler
 
 import (
 	"fmt"
+	"time"
 	"net/http"
 	"regexp"
 	"encoding/json"
@@ -83,8 +84,8 @@ func NewExperimentHandler(experimentStore repo.ExperimentStore,
 // Этим я займусь позже, когда все функции реализую.
 func (h *ExperimentHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var experiment entity.Experiment
-
 	err := json.NewDecoder(r.Body).Decode(&experiment)
+	experiment.CreationDate = time.Now().UTC().Format(time.RFC3339)
 
 	if err != nil {
 		// TODO: Pass errors to the InternalServerErorHandler function.
@@ -145,6 +146,7 @@ func (h *ExperimentHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	experiment, err := h.ExperimentStore.Get(id)
+	fmt.Println(experiment)
 	if err != nil {
 		if err == repo.NotFoundErr {
 			NotFoundHandler(w, r)
@@ -234,13 +236,11 @@ func (h *ExperimentHandler) AddEquipment(w http.ResponseWriter, r *http.Request)
 		log.Fatal("Cant get json body: ", err)
 	}
 
-	fmt.Printf("Где-то здесь паника\n")
 	equipment, err := h.EquipmentStore.Get(payload.EquipmentID)
 	if err != nil {
 		NotFoundHandler(w, r)
 		return
 	}
-	fmt.Printf("Где-то здесь паника\n")
 
 	// Устанавливаем связь между экспериментом и оборудованием.
 	err = h.ExperimentEquipmentStore.Add(experimentID, equipment.ID)
@@ -382,6 +382,7 @@ func (h *ExperimentHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.DeleteEquipment(w, r)
 		return
 	default:
+		http.NotFound(w, r)
 		return
 	}
 }
