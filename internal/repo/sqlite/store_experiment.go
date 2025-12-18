@@ -42,6 +42,7 @@ func (s *SQLiteExperimentStore) Add(ex entity.Experiment) (int, error) {
 	return int(id), nil // Возвращаем ID
 }
 
+// Метод для получения данных об эксперименте по ID.
 func (s *SQLiteExperimentStore) Get(id int) (entity.Experiment, error) {
     var ex entity.Experiment
     err := s.QueryRow("SELECT id, name, description, creation_date FROM experiment WHERE id = ?", id).
@@ -52,12 +53,13 @@ func (s *SQLiteExperimentStore) Get(id int) (entity.Experiment, error) {
     return ex, err
 }
 
+// Метод для обновления данных об эксперименте.
 func (s *SQLiteExperimentStore) Update(id int, ex entity.Experiment) error {
-	// TODO: нужно ли обновлять дату создания?????
     _, err := s.Exec("UPDATE experiment SET name = ?, description = ? WHERE id = ?", ex.Name, ex.Description, id, )
     return err
 }
 
+// Метод для получения списках всех экспериментов из базы данных.
 func (s *SQLiteExperimentStore) List() (map[int]entity.Experiment, error) {
     rows, err := s.Query("SELECT id, name, description, creation_date FROM experiment")
     if err != nil {
@@ -77,8 +79,8 @@ func (s *SQLiteExperimentStore) List() (map[int]entity.Experiment, error) {
     return result, nil
 }
 
+// Метод для удаления данных об эксперименте по ID.
 func (s *SQLiteExperimentStore) Remove(id int) error {
-	// TODO: В остальных структурах у меня выражение DELETE FROM ... WHERE в отдельную перменную вынесено. Возможно стоит так же сделать.
     res, err := s.Exec("DELETE FROM experiment WHERE id = ?", id)
     if err != nil {
         return err

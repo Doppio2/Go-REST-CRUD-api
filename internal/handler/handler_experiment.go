@@ -383,9 +383,6 @@ func (h *ExperimentHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case r.Method == http.MethodDelete && ExperimentReWithID.MatchString(r.URL.Path):
 		h.Delete(w, r)
 		return
-		// TODO: Добавить метод GetEquipment.
-		// TODO: И, возможно, добавить метод GetExperimen
-		// TODO: Не знаю, нужен ли метод GetEquipment(). Возможно да, возможно нет.
 		// -- Операции, связанные с экипировкой, которая принадлежит экспериментам.
 	case r.Method == http.MethodPost && ExperimentEquipmentRe.MatchString(r.URL.Path):
 		h.AddEquipment(w, r)
@@ -393,11 +390,6 @@ func (h *ExperimentHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case r.Method == http.MethodGet && ExperimentEquipmentRe.MatchString(r.URL.Path):
 		h.ListEquipment(w, r)
 		return
-		// TODO: Если я захочу реализовать этот метод, то мне лучше положить его в 
-		// handler_equipment.go и обрабатывать это там. Но мне кажется, что это слишком излишне.
-//	case r.Method == http.MethodGet && ExperimentEquipmentRe.MatchString(r.URL.Path):
-//		h.ListExperiments(w, r)
-//		return
 	case r.Method == http.MethodGet && ExperimentEquipmentReWithID.MatchString(r.URL.Path):
 		h.GetEquipment(w, r)
 		return 

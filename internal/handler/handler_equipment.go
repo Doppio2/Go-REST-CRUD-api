@@ -186,7 +186,7 @@ func (h *EquipmentHandler) Delete(w http.ResponseWriter, r *http.Request) {
     w.WriteHeader(http.StatusNoContent)
 }
 
-// Функций для 
+// Обработка запросов.
 func (h *EquipmentHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case r.Method == http.MethodPost && EquipmentRe.MatchString(r.URL.Path):

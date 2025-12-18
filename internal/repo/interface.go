@@ -5,17 +5,10 @@ import (
 	"errors"
 )
 
-// TODO: я не знаю, куда мне это еще положить.
-var (
-	NotFoundErr = errors.New("not found")
-)
 
-// TODO: Мб стоит это объединить с EquipmentStore, а то у них разницы немного.
-// Либо просто сделать ExperimentStore совместно с ExperimentEquipmentStore.
-// А то у меня тогда просто два одинаковых интерфейса.
-// Больше склоняюсь к варианту с общим интерфейсом с ExperimentEquipmentStore.
-// TODO: во всех методах с List() я получаю все как map[int]'Entity'. 
-// Если честно это выглядит каким-то избытком, но пока лучше оставлю. Не очень хочется щас это менять. Но мб стоит.
+// Интерфейс для equipment хранилища.
+// Поддерживает все CRUD операции.
+// ExportAllToFile метод для записи результата метода List() в файл формата .csv
 type EquipmentStore interface {
     Add(equipment entity.Equipment) (int, error)
     Get(id int) (entity.Equipment, error)
@@ -25,6 +18,9 @@ type EquipmentStore interface {
 	ExportAllToFile(filePath string) error 
 }
 
+// Интерфейс для experiment хранилища.
+// Поддерживает все CRUD операции.
+// ExportAllToFile метод для записи результата метода List() в файл формата .csv
 type ExperimentStore interface {
     Add(equipment entity.Experiment) (int, error)
     Get(id int) (entity.Experiment, error)
@@ -34,12 +30,16 @@ type ExperimentStore interface {
 	ExportAllToFile(filePath string) error 
 }
 
+// Интерфейс для хранилища связной таблицы.
+// Не реализует все CRUD операции, а только
+// Добавление
+// Удаление
+// Получаение записи об научном оборудовании
+// Получения всего списка оборудования, которое учавствует в эксперименте.
 type ExperimentEquipmentStore interface {
-	Add(experimentId int , equipmentId int) error
+	Add(experimentId int, equipmentId int) error
     Remove(experimentId int, equipmentId int) error
 	GetEquipment(experimentId int, equipmentId int) (entity.Equipment, error)
     ListEquipment(experimentId int) (map[int]entity.Equipment, error)
 	ExportEquipmentToFile(experimentId int, filePath string) error
-	// NOTE: пока что это нигде не используется. И не думаю, что я придумаю, как это использовать.
-	//ListExperiments(equipmentId int) (map[int]entity.Experiment, error)
 }
