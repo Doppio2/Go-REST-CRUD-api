@@ -15,7 +15,6 @@ import (
 
 // Регулярные выражения для обращения к страницам с определенным оборудованием.
 var (
-	// TODO: пока что временно тут чисто числа в url, но я пока не особо хочу заморачиваться с этим всем. Так что пусть будет так.
 	EquipmentRe = regexp.MustCompile(`^/equipment/?$`)
 	EquipmentReWithID = regexp.MustCompile(`^/equipment/([0-9]+)$`)
 )

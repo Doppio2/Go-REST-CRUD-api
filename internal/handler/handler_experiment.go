@@ -14,9 +14,8 @@ import (
 	"go_rest_crud/internal/entity"
 )
 
-// Регулярные выражения для обращения к страницам с определенным оборудованием и к техники с этим оборудованием.
+// Регулярные выражения для обращения к страницам с определенным оборудованием и к техникe с этим оборудованием.
 var (
-	// TODO: пока что временно тут чисто числа в url, но я пока не особо хочу заморачиваться с этим всем. Так что пусть будет так.
 	ExperimentRe                = regexp.MustCompile(`^/experiment/?$`)
 	ExperimentReWithID          = regexp.MustCompile(`^/experiment/([0-9]+)$`)
 	ExperimentEquipmentRe       = regexp.MustCompile(`^/experiment/([0-9]+)/equipment/?$`)

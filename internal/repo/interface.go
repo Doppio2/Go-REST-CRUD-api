@@ -5,6 +5,9 @@ import (
 	"errors"
 )
 
+var (
+	NotFoundErr = errors.New("not found")
+)
 
 // Интерфейс для equipment хранилища.
 // Поддерживает все CRUD операции.
