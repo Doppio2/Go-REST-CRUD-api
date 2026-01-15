@@ -39,18 +39,17 @@ func (h *EquipmentHandler) Create(w http.ResponseWriter, r *http.Request) {
 	equipment.CreationDate = time.Now().UTC().Format(time.RFC3339)
 
 	if err != nil {
-		// TODO: Log later.
-		// TODO: Pass errors to the InternalServerErorHandler function.
-		log.Fatal("Cant get json body: ", err)
+		log.Printf("ERROR: [EquipmentHandler.Create] failed to decode JSON: %v", err)
 		InternalServerErrorHandler(w, r)
 		return 
 	}
 
 	id, err := h.store.Add(equipment)
 	if err != nil {
-		// TODO: Log later.
 		// TODO: Pass errors to the InternalServerErorHandler function.
-		log.Fatal("Can not add equipment to the database", err)
+		//log.Fatal("Can not add equipment to the database", err)
+		log.Printf("ERROR: [EquipmentHandler.Create] database error: %v", err)
+
 		InternalServerErrorHandler(w, r)
 		return
 	}
@@ -67,6 +66,7 @@ func (h *EquipmentHandler) List(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Query().Get("format") == "csv" {
 		filename := "all_equipment.csv"
 		if err := h.store.ExportAllToFile(filename); err != nil {
+			log.Printf("ERROR: [EquipmentHandler.List] failed to export CSV to %s: %v", filename, err)
 			http.Error(w, err.Error(), 500)
 			return
 		}
@@ -76,7 +76,7 @@ func (h *EquipmentHandler) List(w http.ResponseWriter, r *http.Request) {
 
     equipmentMap, err := h.store.List()
     if err != nil {
-		// TODO: Log later.
+		log.Printf("ERROR: [EquipmentHandler.List] database error: %v", err)
         InternalServerErrorHandler(w, r)
         return
     }
@@ -88,6 +88,7 @@ func (h *EquipmentHandler) List(w http.ResponseWriter, r *http.Request) {
 
     jsonBytes, err := json.Marshal(equipmentList)
     if err != nil {
+		log.Printf("ERROR: [EquipmentHandler.List] failed to marshal JSON: %v", err)
         InternalServerErrorHandler(w, r)
         return
     }
@@ -102,6 +103,7 @@ func (h *EquipmentHandler) Get(w http.ResponseWriter, r *http.Request) {
 	matches := EquipmentReWithID.FindStringSubmatch(r.URL.Path)
 
 	if len(matches) < 2 {
+		log.Printf("ERROR: [EquipmentHandler.Get] failed to extract ID from path: %s", r.URL.Path)
 		InternalServerErrorHandler(w, r)
 		return
 	}
@@ -109,14 +111,17 @@ func (h *EquipmentHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(matches[1])
 	if err != nil {
 		// TODO: Log later.
-		log.Fatal("Can't get element ID: ", err)
+		log.Printf("ERROR: [EquipmentHandler.Get] invalid ID format '%s': %v", matches[1], err)
+		http.Error(w, "Invalid ID format", http.StatusBadRequest)
 	}
 
 	equipment, err := h.store.Get(id)
 	if err != nil {
 		if err == repo.NotFoundErr {
+			log.Printf("INFO: [EquipmentHandler.Get] equipment with ID %d not found", id)
 			NotFoundHandler(w, r)
 		} else {
+			log.Printf("ERROR: [EquipmentHandler.Get] database error for ID %d: %v", id, err)
 			InternalServerErrorHandler(w, r)
 		}
 		
@@ -125,6 +130,7 @@ func (h *EquipmentHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	jsonBytes, err := json.Marshal(equipment)
 	if err != nil {
+		log.Printf("ERROR: [EquipmentHandler.Get] failed to marshal JSON for ID %d: %v", id, err)
 		InternalServerErrorHandler(w, r)
 	}
 
@@ -135,7 +141,8 @@ func (h *EquipmentHandler) Get(w http.ResponseWriter, r *http.Request) {
 func (h *EquipmentHandler) Update(w http.ResponseWriter, r *http.Request) {
     matches := EquipmentReWithID.FindStringSubmatch(r.URL.Path)
     if len(matches) < 2 {
-        InternalServerErrorHandler(w, r)
+		log.Printf("ERROR: [EquipmentHandler.Update] missing ID in path: %s", r.URL.Path)
+		InternalServerErrorHandler(w, r)
         return
     }
 
@@ -143,45 +150,52 @@ func (h *EquipmentHandler) Update(w http.ResponseWriter, r *http.Request) {
 	
     err := json.NewDecoder(r.Body).Decode(&equipment)
 	if err != nil {
-        InternalServerErrorHandler(w, r)
+		log.Printf("ERROR: [EquipmentHandler.Update] failed to decode JSON: %v", err)
+		InternalServerErrorHandler(w, r)
         return
     }
 
 	id, err := strconv.Atoi(matches[1])
 	if err != nil {
-		// TODO: Log later.
+		log.Printf("ERROR: [EquipmentHandler.Update] invalid ID format '%s': %v", matches[1], err)
 		log.Fatal("Can't get elemetn ID: ", err)
 	}
 
     if err := h.store.Update(id, equipment); err != nil {
         if err == repo.NotFoundErr {
+			log.Printf("INFO: [EquipmentHandler.Update] attempt to update non-existent ID %d", id)
             NotFoundHandler(w, r)
             return
         }
-        InternalServerErrorHandler(w, r)
-        return
+		log.Printf("ERROR: [EquipmentHandler.Update] database error for ID %d: %v", id, err)
+		InternalServerErrorHandler(w, r)
+		return
     }
 
+	log.Printf("INFO: [EquipmentHandler.Update] successfully updated equipment ID %d", id)
     w.WriteHeader(http.StatusOK)
 }
 
 func (h *EquipmentHandler) Delete(w http.ResponseWriter, r *http.Request) {
     matches := EquipmentReWithID.FindStringSubmatch(r.URL.Path)
     if len(matches) < 2 {
+		log.Printf("ERROR: [EquipmentHandler.Delete] missing ID in path: %s", r.URL.Path)
         InternalServerErrorHandler(w, r)
         return
     }
 
 	id, err := strconv.Atoi(matches[1])
 	if err != nil {
-		// TODO: Log later.
+		log.Printf("ERROR: [EquipmentHandler.Delete] invalid ID format '%s': %v", matches[1], err)
 		log.Fatal("Can't get element ID: ", err)
 	}
 
     if err := h.store.Remove(id); err != nil {
+		log.Printf("ERROR: [EquipmentHandler.Delete] database error for ID %d: %v", id, err)
         InternalServerErrorHandler(w, r)
         return
     }
+log.Printf("INFO: [EquipmentHandler.Delete] successfully removed equipment ID %d", id)
     w.WriteHeader(http.StatusNoContent)
 }
 
