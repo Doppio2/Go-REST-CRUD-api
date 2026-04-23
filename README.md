@@ -56,3 +56,8 @@ go run ./cli/migrate down
 ```
 
 The SQLite database path defaults to `db/go_rest_crud.db`. Override it with `SQLITE_PATH`.
+
+Additional runtime configuration:
+
+- `APP_PORT` sets the HTTP port. Default: `8080`
+- `AUTO_MIGRATE` controls whether the API applies pending migrations on startup. Default: `true`

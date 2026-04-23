@@ -5,10 +5,16 @@ import (
 	"log"
 	"os"
 
+	"go_rest_crud/internal/config"
 	"go_rest_crud/internal/repo/sqlite"
 )
 
 func main() {
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatal("Can't load config: ", err)
+	}
+
 	command := "up"
 	args := os.Args[1:]
 	if len(args) > 0 {
@@ -16,7 +22,7 @@ func main() {
 		args = args[1:]
 	}
 
-	db, dbPath, err := sqlite.OpenDatabase()
+	db, dbPath, err := sqlite.OpenDatabase(cfg.SQLitePath)
 	if err != nil {
 		log.Fatal("Can't connect to a data base: ", err)
 	}

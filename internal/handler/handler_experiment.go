@@ -35,7 +35,7 @@ func GetExperimentID(w http.ResponseWriter, r *http.Request) (int, error) {
 	var err error
 	if len(parts) < 3 {
 		log.Printf("ERROR: [GetExperimentID] path too short: %s", r.URL.Path)
-		http.Error(w, "Invalid URL", http.StatusBadRequest)
+		BadRequestHandler(w, "invalid URL")
 		return 0, err
 	}
 
@@ -43,7 +43,7 @@ func GetExperimentID(w http.ResponseWriter, r *http.Request) (int, error) {
 	result, err := strconv.Atoi(parts[2])
 	if err != nil {
 		log.Printf("ERROR: [GetExperimentID] cannot parse ID '%s' from path: %v", parts[2], err)
-		http.Error(w, "Invalid experiment ID", http.StatusBadRequest)
+		BadRequestHandler(w, "invalid experiment ID")
 		return 0, err
 	}
 
@@ -55,7 +55,7 @@ func GetEquipmentID(w http.ResponseWriter, r *http.Request) (int, error) {
 	var err error
 	if len(parts) < 5 {
 		log.Printf("ERROR: [GetEquipmentID] path too short, expected at least 5 parts: %s", r.URL.Path)
-		http.Error(w, "Invalid URL", http.StatusBadRequest)
+		BadRequestHandler(w, "invalid URL")
 		return 0, err
 	}
 
@@ -63,7 +63,7 @@ func GetEquipmentID(w http.ResponseWriter, r *http.Request) (int, error) {
 	result, err := strconv.Atoi(parts[4])
 	if err != nil {
 		log.Printf("ERROR: [GetEquipmentID] cannot parse equipment ID '%s' from path: %v", parts[4], err)
-		http.Error(w, "Invalid equipment ID", http.StatusBadRequest)
+		BadRequestHandler(w, "invalid equipment ID")
 		return 0, err
 	}
 
@@ -88,14 +88,20 @@ func NewExperimentHandler(experimentStore repo.ExperimentStore,
 func (h *ExperimentHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var experiment entity.Experiment
 	err := json.NewDecoder(r.Body).Decode(&experiment)
-	experiment.CreationDate = time.Now().UTC().Format(time.RFC3339)
-
 	if err != nil {
-		// TODO: Pass errors to the InternalServerErorHandler function.
 		log.Printf("ERROR: [ExperimentHandler.Create] failed to decode JSON: %v", err)
-		InternalServerErrorHandler(w, r)
+		BadRequestHandler(w, "invalid request body")
 		return
 	}
+
+	experiment.Name, experiment.Description, err = normalizeAndValidatePayload(experiment.Name, experiment.Description)
+	if err != nil {
+		log.Printf("ERROR: [ExperimentHandler.Create] validation failed: %v", err)
+		ValidationErrorHandler(w, err.Error())
+		return
+	}
+
+	experiment.CreationDate = time.Now().UTC().Format(time.RFC3339)
 
 	id, err := h.ExperimentStore.Add(experiment)
 	if err != nil {
@@ -109,9 +115,7 @@ func (h *ExperimentHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("INFO: [ExperimentHandler.Create] successfully created experiment with ID %d", id)
 
-	w.Header().Set("Content-Type", "application/json") // <-- Сначала заголовки
-	w.WriteHeader(http.StatusCreated)                  // <-- Потом статус
-	json.NewEncoder(w).Encode(experiment)
+	writeJSONResponse(w, http.StatusCreated, experiment)
 }
 
 func (h *ExperimentHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -119,7 +123,7 @@ func (h *ExperimentHandler) List(w http.ResponseWriter, r *http.Request) {
 		filename := "all_experiments.csv"
 		if err := h.ExperimentStore.ExportAllToFile(filename); err != nil {
 			log.Printf("ERROR: [ExperimentHandler.List] failed to export experiments to %s: %v", filename, err)
-			http.Error(w, err.Error(), 500)
+			InternalServerErrorHandler(w, r)
 			return
 		}
 		log.Printf("INFO: [ExperimentHandler.List] successfully exported experiments to %s", filename)
@@ -139,16 +143,7 @@ func (h *ExperimentHandler) List(w http.ResponseWriter, r *http.Request) {
 		experimentList = append(experimentList, eq)
 	}
 
-	jsonBytes, err := json.Marshal(experimentList)
-	if err != nil {
-		log.Printf("ERROR: [ExperimentHandler.List] failed to marshal JSON: %v", err)
-		InternalServerErrorHandler(w, r)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	w.Write(jsonBytes)
+	writeJSONResponse(w, http.StatusOK, experimentList)
 }
 
 func (h *ExperimentHandler) Get(w http.ResponseWriter, r *http.Request) {
@@ -163,7 +158,7 @@ func (h *ExperimentHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(matches[1])
 	if err != nil {
 		log.Printf("ERROR: [ExperimentHandler.Get] invalid ID format '%s': %v", matches[1], err)
-		http.Error(w, "Invalid ID format", http.StatusBadRequest)
+		BadRequestHandler(w, "invalid ID format")
 		return
 	}
 
@@ -182,16 +177,7 @@ func (h *ExperimentHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("DEBUG: [ExperimentHandler.Get] successfully retrieved experiment: %+v", experiment)
 
-	jsonBytes, err := json.Marshal(experiment)
-	if err != nil {
-		log.Printf("ERROR: [ExperimentHandler.Get] failed to marshal JSON for ID %d: %v", id, err)
-		InternalServerErrorHandler(w, r)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	w.Write(jsonBytes)
+	writeJSONResponse(w, http.StatusOK, experiment)
 }
 
 func (h *ExperimentHandler) Update(w http.ResponseWriter, r *http.Request) {
@@ -207,14 +193,21 @@ func (h *ExperimentHandler) Update(w http.ResponseWriter, r *http.Request) {
 	err := json.NewDecoder(r.Body).Decode(&experiment)
 	if err != nil {
 		log.Printf("ERROR: [ExperimentHandler.Update] failed to decode JSON: %v", err)
-		InternalServerErrorHandler(w, r)
+		BadRequestHandler(w, "invalid request body")
+		return
+	}
+
+	experiment.Name, experiment.Description, err = normalizeAndValidatePayload(experiment.Name, experiment.Description)
+	if err != nil {
+		log.Printf("ERROR: [ExperimentHandler.Update] validation failed: %v", err)
+		ValidationErrorHandler(w, err.Error())
 		return
 	}
 
 	id, err := strconv.Atoi(matches[1])
 	if err != nil {
 		log.Printf("ERROR: [ExperimentHandler.Update] invalid ID format '%s': %v", matches[1], err)
-		http.Error(w, "Invalid ID format", http.StatusBadRequest)
+		BadRequestHandler(w, "invalid ID format")
 		return
 	}
 
@@ -229,8 +222,15 @@ func (h *ExperimentHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	updatedExperiment, err := h.ExperimentStore.Get(id)
+	if err != nil {
+		log.Printf("ERROR: [ExperimentHandler.Update] failed to fetch updated experiment ID %d: %v", id, err)
+		InternalServerErrorHandler(w, r)
+		return
+	}
+
 	log.Printf("INFO: [ExperimentHandler.Update] successfully updated experiment ID %d", id)
-	w.WriteHeader(http.StatusOK)
+	writeJSONResponse(w, http.StatusOK, updatedExperiment)
 }
 
 func (h *ExperimentHandler) Delete(w http.ResponseWriter, r *http.Request) {
@@ -244,7 +244,7 @@ func (h *ExperimentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(matches[1])
 	if err != nil {
 		log.Printf("ERROR: [ExperimentHandler.Delete] invalid ID format '%s': %v", matches[1], err)
-		http.Error(w, "Invalid ID format", http.StatusBadRequest)
+		BadRequestHandler(w, "invalid ID format")
 		return
 	}
 
@@ -268,7 +268,6 @@ func (h *ExperimentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 func (h *ExperimentHandler) AddEquipment(w http.ResponseWriter, r *http.Request) {
 	experimentID, err := GetExperimentID(w, r)
 	if err != nil {
-		http.Error(w, "Invalid experiment ID", http.StatusBadRequest)
 		return
 	}
 
@@ -289,7 +288,12 @@ func (h *ExperimentHandler) AddEquipment(w http.ResponseWriter, r *http.Request)
 	err = json.NewDecoder(r.Body).Decode(&payload)
 	if err != nil {
 		log.Printf("ERROR: [ExperimentHandler.AddEquipment] failed to decode JSON payload: %v", err)
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		BadRequestHandler(w, "invalid request body")
+		return
+	}
+
+	if payload.EquipmentID <= 0 {
+		ValidationErrorHandler(w, "equipment_id must be a positive integer")
 		return
 	}
 
@@ -304,20 +308,22 @@ func (h *ExperimentHandler) AddEquipment(w http.ResponseWriter, r *http.Request)
 	err = h.ExperimentEquipmentStore.Add(experimentID, equipment.ID)
 	if err != nil {
 		log.Printf("ERROR: [ExperimentHandler.AddEquipment] failed to link experiment %d and equipment %d: %v", experimentID, payload.EquipmentID, err)
-		http.Error(w, "Failed to add equipment to experiment", http.StatusInternalServerError)
+		InternalServerErrorHandler(w, r)
 		return
 	}
 
 	// TODO: возможно стоит лучше поставить http.StatusCreated.
 	log.Printf("INFO: [ExperimentHandler.AddEquipment] successfully linked equipment %d to experiment %d", payload.EquipmentID, experimentID)
-	w.WriteHeader(http.StatusCreated)
+	writeJSONResponse(w, http.StatusCreated, map[string]int{
+		"experiment_id": experimentID,
+		"equipment_id":  payload.EquipmentID,
+	})
 }
 
 // Получения списка всего оборудования, которое используется в эксперименте.
 func (h *ExperimentHandler) ListEquipment(w http.ResponseWriter, r *http.Request) {
 	experimentID, err := GetExperimentID(w, r)
 	if err != nil {
-		http.Error(w, "Invalid experiment ID", http.StatusBadRequest)
 		return
 	}
 
@@ -328,7 +334,7 @@ func (h *ExperimentHandler) ListEquipment(w http.ResponseWriter, r *http.Request
 		// ВАЖНО: здесь метод принимает ID
 		if err := h.ExperimentEquipmentStore.ExportEquipmentToFile(experimentID, filename); err != nil {
 			log.Printf("ERROR: [ExperimentHandler.ListEquipment] failed to export CSV for experiment %d: %v", experimentID, err)
-			http.Error(w, err.Error(), 500)
+			InternalServerErrorHandler(w, r)
 			return
 		}
 		log.Printf("INFO: [ExperimentHandler.ListEquipment] successfully exported CSV for experiment %d", experimentID)
@@ -339,7 +345,7 @@ func (h *ExperimentHandler) ListEquipment(w http.ResponseWriter, r *http.Request
 	equipmentMap, err := h.ExperimentEquipmentStore.ListEquipment(experimentID)
 	if err != nil {
 		log.Printf("ERROR: [ExperimentHandler.ListEquipment] database error for experiment %d: %v", experimentID, err)
-		http.Error(w, "Failed to fetch equipment list", http.StatusInternalServerError)
+		InternalServerErrorHandler(w, r)
 		return
 	}
 
@@ -348,19 +354,9 @@ func (h *ExperimentHandler) ListEquipment(w http.ResponseWriter, r *http.Request
 		equipmentList = append(equipmentList, eq)
 	}
 
-	jsonBytes, err := json.Marshal(equipmentList)
-	if err != nil {
-		log.Printf("ERROR: [ExperimentHandler.ListEquipment] failed to marshal JSON for experiment %d: %v", experimentID, err)
-		InternalServerErrorHandler(w, r)
-		return
-	}
-
 	log.Printf("INFO: [ExperimentHandler.ListEquipment] returned %d items for experiment %d", len(equipmentList), experimentID)
 
-	// TODO: Возможно стоит выделить это в отдельную функцию.
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	w.Write(jsonBytes)
+	writeJSONResponse(w, http.StatusOK, equipmentList)
 }
 
 func (h *ExperimentHandler) GetEquipment(w http.ResponseWriter, r *http.Request) {
@@ -395,8 +391,7 @@ func (h *ExperimentHandler) GetEquipment(w http.ResponseWriter, r *http.Request)
 
 	log.Printf("INFO: [ExperimentHandler.GetEquipment] successfully retrieved equipment %d for experiment %d", equipmentID, experimentID)
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(equipment)
+	writeJSONResponse(w, http.StatusOK, equipment)
 }
 
 // Удаление оборудования из эксперимента
@@ -413,27 +408,15 @@ func (h *ExperimentHandler) DeleteEquipment(w http.ResponseWriter, r *http.Reque
 
 	err = h.ExperimentEquipmentStore.Remove(experimentID, equipmentID)
 
-	/*
-		if err == repo.NotFoundErr { // <-- 1. Сначала проверяем 404
-			http.Error(w, "Experiment equipment link not found", http.StatusNotFound)
-			return
-		}
-		if err != nil { // <-- 2. Затем проверяем другие ошибки (500)
-			// Используйте InternalServerErrorHandler или явно 500
-			http.Error(w, "Failed to delete equipment from experiment", http.StatusInternalServerError)
-			return
-		}
-	*/
-
 	if err != nil {
 		if err == repo.NotFoundErr {
 			// Логируем попытку удаления несуществующей связи
 			log.Printf("INFO: [ExperimentHandler.DeleteEquipment] link not found for Exp: %d, Eq: %d", experimentID, equipmentID)
-			http.Error(w, "Experiment equipment link not found", http.StatusNotFound)
+			NotFoundHandler(w, r)
 			return
 		}
 		log.Printf("ERROR: [ExperimentHandler.DeleteEquipment] database error (Exp: %d, Eq: %d): %v", experimentID, equipmentID, err)
-		http.Error(w, "Failed to delete equipment from experiment", http.StatusInternalServerError)
+		InternalServerErrorHandler(w, r)
 		return
 	}
 

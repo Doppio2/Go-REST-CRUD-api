@@ -7,18 +7,7 @@ import (
 	"path/filepath"
 )
 
-const defaultDatabasePath = "db/go_rest_crud.db"
-
-func ResolveDatabasePath() string {
-	if path := os.Getenv("SQLITE_PATH"); path != "" {
-		return path
-	}
-
-	return defaultDatabasePath
-}
-
-func OpenDatabase() (*sql.DB, string, error) {
-	dbPath := ResolveDatabasePath()
+func OpenDatabase(dbPath string) (*sql.DB, string, error) {
 	if dbPath != ":memory:" {
 		if err := os.MkdirAll(filepath.Dir(dbPath), 0o755); err != nil {
 			return nil, "", fmt.Errorf("create database directory: %w", err)

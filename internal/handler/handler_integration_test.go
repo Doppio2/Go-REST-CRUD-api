@@ -24,7 +24,14 @@ import (
 
 // ErrorResponse используется для десериализации ответа об ошибке из handler_error.go
 type ErrorResponse struct {
-	Message string `json:"message"`
+	Error struct {
+		Code    string `json:"code"`
+		Message string `json:"message"`
+	} `json:"error"`
+}
+
+type SuccessResponse[T any] struct {
+	Data T `json:"data"`
 }
 
 // ====================================================================================================
@@ -106,11 +113,11 @@ func TestEquipmentHandlerCRUD_Integration(t *testing.T) {
 
 		assert.Equal(t, http.StatusCreated, rr.Code)
 
-		var eq entity.Equipment
-		err := json.Unmarshal(rr.Body.Bytes(), &eq)
+		var response SuccessResponse[entity.Equipment]
+		err := json.Unmarshal(rr.Body.Bytes(), &response)
 		assert.NoError(t, err)
-		assert.True(t, eq.ID > 0, "Ожидался ID")
-		createdID = eq.ID // Сохраняем ID
+		assert.True(t, response.Data.ID > 0, "Ожидался ID")
+		createdID = response.Data.ID // Сохраняем ID
 	})
 
 	// 2. GET /equipment/{id} (Read/Get)
@@ -121,10 +128,10 @@ func TestEquipmentHandlerCRUD_Integration(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, rr.Code)
 
-		var eq entity.Equipment
-		err := json.Unmarshal(rr.Body.Bytes(), &eq)
+		var response SuccessResponse[entity.Equipment]
+		err := json.Unmarshal(rr.Body.Bytes(), &response)
 		assert.NoError(t, err)
-		assert.Equal(t, createdID, eq.ID)
+		assert.Equal(t, createdID, response.Data.ID)
 	})
 
 	t.Run("Equipment_Get_NotFound", func(t *testing.T) {
@@ -133,6 +140,20 @@ func TestEquipmentHandlerCRUD_Integration(t *testing.T) {
 		rr := executeRequest(mux, req)
 
 		assert.Equal(t, http.StatusNotFound, rr.Code)
+	})
+
+	t.Run("Equipment_Create_ValidationError", func(t *testing.T) {
+		req, _ := http.NewRequest("POST", "/equipment", bytes.NewBufferString(`{"name":"   ","description":"x"}`))
+		req.Header.Set("Content-Type", "application/json")
+		rr := executeRequest(mux, req)
+
+		assert.Equal(t, http.StatusBadRequest, rr.Code)
+
+		var response ErrorResponse
+		err := json.Unmarshal(rr.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Equal(t, "validation_error", response.Error.Code)
+		assert.Contains(t, response.Error.Message, "name")
 	})
 
 	// 3. PUT /equipment/{id} (Update)
@@ -144,6 +165,11 @@ func TestEquipmentHandlerCRUD_Integration(t *testing.T) {
 		rr := executeRequest(mux, req)
 
 		assert.Equal(t, http.StatusOK, rr.Code)
+
+		var response SuccessResponse[entity.Equipment]
+		err := json.Unmarshal(rr.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Equal(t, createdID, response.Data.ID)
 	})
 
 	// FIXME: тесты сейчас не работают.
@@ -154,10 +180,10 @@ func TestEquipmentHandlerCRUD_Integration(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, rr.Code)
 
-		var list []entity.Equipment
-		err := json.Unmarshal(rr.Body.Bytes(), &list)
+		var response SuccessResponse[[]entity.Equipment]
+		err := json.Unmarshal(rr.Body.Bytes(), &response)
 		assert.NoError(t, err)
-		assert.Len(t, list, 1)
+		assert.Len(t, response.Data, 1)
 	})
 
 	// 5. DELETE /equipment/{id} (Remove)
@@ -217,9 +243,10 @@ func TestExperimentHandlerCRUD_Integration(t *testing.T) {
 		reqExp.Header.Set("Content-Type", "application/json")
 		rrExp := executeRequest(mux, reqExp)
 		assert.Equal(t, http.StatusCreated, rrExp.Code)
-		var exp entity.Experiment
-		json.Unmarshal(rrExp.Body.Bytes(), &exp)
-		expID = exp.ID
+		var experimentResponse SuccessResponse[entity.Experiment]
+		err := json.Unmarshal(rrExp.Body.Bytes(), &experimentResponse)
+		assert.NoError(t, err)
+		expID = experimentResponse.Data.ID
 
 		// 1.2 Создание Оборудования 1 (POST /equipment)
 		eqPayload1 := readTestData(t, "new_equipment.json")
@@ -227,9 +254,10 @@ func TestExperimentHandlerCRUD_Integration(t *testing.T) {
 		reqEq1.Header.Set("Content-Type", "application/json")
 		rrEq1 := executeRequest(mux, reqEq1)
 		assert.Equal(t, http.StatusCreated, rrEq1.Code)
-		var eq1 entity.Equipment
-		json.Unmarshal(rrEq1.Body.Bytes(), &eq1)
-		eqID1 = eq1.ID
+		var equipmentResponse1 SuccessResponse[entity.Equipment]
+		err = json.Unmarshal(rrEq1.Body.Bytes(), &equipmentResponse1)
+		assert.NoError(t, err)
+		eqID1 = equipmentResponse1.Data.ID
 
 		// 1.3 Создание Оборудования 2
 		eqPayload2 := []byte(`{"name": "Laser", "description": "High-power beam"}`)
@@ -237,9 +265,24 @@ func TestExperimentHandlerCRUD_Integration(t *testing.T) {
 		reqEq2.Header.Set("Content-Type", "application/json")
 		rrEq2 := executeRequest(mux, reqEq2)
 		assert.Equal(t, http.StatusCreated, rrEq2.Code)
-		var eq2 entity.Equipment
-		json.Unmarshal(rrEq2.Body.Bytes(), &eq2)
-		eqID2 = eq2.ID
+		var equipmentResponse2 SuccessResponse[entity.Equipment]
+		err = json.Unmarshal(rrEq2.Body.Bytes(), &equipmentResponse2)
+		assert.NoError(t, err)
+		eqID2 = equipmentResponse2.Data.ID
+	})
+
+	t.Run("Experiment_Create_ValidationError", func(t *testing.T) {
+		req, _ := http.NewRequest("POST", "/experiments", bytes.NewBufferString(`{"name":"   ","description":"invalid"}`))
+		req.Header.Set("Content-Type", "application/json")
+		rr := executeRequest(mux, req)
+
+		assert.Equal(t, http.StatusBadRequest, rr.Code)
+
+		var response ErrorResponse
+		err := json.Unmarshal(rr.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Equal(t, "validation_error", response.Error.Code)
+		assert.Contains(t, response.Error.Message, "name")
 	})
 
 	// 2. M2M: POST /experiment/{id}/equipment (Add Equipment)
@@ -253,12 +296,39 @@ func TestExperimentHandlerCRUD_Integration(t *testing.T) {
 		rr1 := executeRequest(mux, req1)
 		assert.Equal(t, http.StatusCreated, rr1.Code, "Добавление первого оборудования должно быть успешным")
 
+		var linkResponse1 SuccessResponse[map[string]int]
+		err := json.Unmarshal(rr1.Body.Bytes(), &linkResponse1)
+		assert.NoError(t, err)
+		assert.Equal(t, expID, linkResponse1.Data["experiment_id"])
+		assert.Equal(t, eqID1, linkResponse1.Data["equipment_id"])
+
 		// 2.2 Добавление Оборудования 2
 		payload2 := fmt.Sprintf(`{"equipment_id": %d}`, eqID2)
 		req2, _ := http.NewRequest("POST", url, bytes.NewBufferString(payload2))
 		req2.Header.Set("Content-Type", "application/json")
 		rr2 := executeRequest(mux, req2)
 		assert.Equal(t, http.StatusCreated, rr2.Code, "Добавление второго оборудования должно быть успешным")
+
+		var linkResponse2 SuccessResponse[map[string]int]
+		err = json.Unmarshal(rr2.Body.Bytes(), &linkResponse2)
+		assert.NoError(t, err)
+		assert.Equal(t, expID, linkResponse2.Data["experiment_id"])
+		assert.Equal(t, eqID2, linkResponse2.Data["equipment_id"])
+	})
+
+	t.Run("M2M_AddEquipment_BadRequest", func(t *testing.T) {
+		url := fmt.Sprintf("/experiment/%d/equipment", expID)
+		req, _ := http.NewRequest("POST", url, bytes.NewBufferString(`{"equipment_id":0}`))
+		req.Header.Set("Content-Type", "application/json")
+		rr := executeRequest(mux, req)
+
+		assert.Equal(t, http.StatusBadRequest, rr.Code)
+
+		var response ErrorResponse
+		err := json.Unmarshal(rr.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Equal(t, "validation_error", response.Error.Code)
+		assert.Contains(t, response.Error.Message, "equipment_id")
 	})
 
 	// 3. M2M: GET /experiment/{id}/equipment (List Equipment)
@@ -269,10 +339,10 @@ func TestExperimentHandlerCRUD_Integration(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, rr.Code)
 
-		var list []entity.Equipment
-		err := json.Unmarshal(rr.Body.Bytes(), &list)
+		var response SuccessResponse[[]entity.Equipment]
+		err := json.Unmarshal(rr.Body.Bytes(), &response)
 		assert.NoError(t, err)
-		assert.Len(t, list, 2, "Должно быть два прикрепленных оборудования")
+		assert.Len(t, response.Data, 2, "Должно быть два прикрепленных оборудования")
 	})
 
 	// 4. M2M: DELETE /experiment/{id}/equipment/{equipment_id} (Remove Equipment)
@@ -288,10 +358,10 @@ func TestExperimentHandlerCRUD_Integration(t *testing.T) {
 		reqList, _ := http.NewRequest("GET", listURL, nil)
 		rrList := executeRequest(mux, reqList)
 
-		var list []entity.Equipment // <-- ИСПРАВЛЕНИЕ: Используйте СЛАЙС, как в M2M_ListEquipment_Success
-		err := json.Unmarshal(rrList.Body.Bytes(), &list)
-		assert.NoError(t, err) // <-- Хорошо бы добавить проверку на ошибку десериализации
-		assert.Len(t, list, 1, "После удаления должен остаться только один элемент")
+		var response SuccessResponse[[]entity.Equipment]
+		err := json.Unmarshal(rrList.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Len(t, response.Data, 1, "После удаления должен остаться только один элемент")
 	})
 
 	t.Run("M2M_RemoveEquipment_NotFound", func(t *testing.T) {
@@ -308,6 +378,11 @@ func TestExperimentHandlerCRUD_Integration(t *testing.T) {
 		req, _ := http.NewRequest("GET", url, nil)
 		rr := executeRequest(mux, req)
 		assert.Equal(t, http.StatusOK, rr.Code)
+
+		var response SuccessResponse[entity.Experiment]
+		err := json.Unmarshal(rr.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Equal(t, expID, response.Data.ID)
 	})
 
 	t.Run("Experiment_GetEquipment_Success", func(t *testing.T) {
@@ -317,10 +392,10 @@ func TestExperimentHandlerCRUD_Integration(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, rr.Code)
 
-		var eq entity.Equipment
-		err := json.Unmarshal(rr.Body.Bytes(), &eq)
+		var response SuccessResponse[entity.Equipment]
+		err := json.Unmarshal(rr.Body.Bytes(), &response)
 		assert.NoError(t, err)
-		assert.Equal(t, eqID2, eq.ID)
+		assert.Equal(t, eqID2, response.Data.ID)
 	})
 
 	t.Run("Experiment_Remove_Success_Cascades", func(t *testing.T) {
@@ -350,11 +425,11 @@ func TestExperimentPluralRoutes_Integration(t *testing.T) {
 	rrCreate := executeRequest(mux, reqCreate)
 	assert.Equal(t, http.StatusCreated, rrCreate.Code)
 
-	var exp entity.Experiment
-	err := json.Unmarshal(rrCreate.Body.Bytes(), &exp)
+	var response SuccessResponse[entity.Experiment]
+	err := json.Unmarshal(rrCreate.Body.Bytes(), &response)
 	assert.NoError(t, err)
 
-	reqGet, _ := http.NewRequest("GET", fmt.Sprintf("/experiments/%d", exp.ID), nil)
+	reqGet, _ := http.NewRequest("GET", fmt.Sprintf("/experiments/%d", response.Data.ID), nil)
 	rrGet := executeRequest(mux, reqGet)
 	assert.Equal(t, http.StatusOK, rrGet.Code)
 }
@@ -369,9 +444,10 @@ func TestMassiveExperimentEquipmentExport_Integration(t *testing.T) {
 	reqExp.Header.Set("Content-Type", "application/json")
 	rrExp := executeRequest(mux, reqExp)
 
-	var exp entity.Experiment
-	json.Unmarshal(rrExp.Body.Bytes(), &exp)
-	expID := exp.ID
+	var experimentResponse SuccessResponse[entity.Experiment]
+	err := json.Unmarshal(rrExp.Body.Bytes(), &experimentResponse)
+	assert.NoError(t, err)
+	expID := experimentResponse.Data.ID
 
 	// 2. Создаем 10 единиц оборудования и сразу привязываем их к эксперименту
 	for i := 1; i <= 10; i++ {
@@ -382,11 +458,12 @@ func TestMassiveExperimentEquipmentExport_Integration(t *testing.T) {
 		reqEq.Header.Set("Content-Type", "application/json")
 		rrEq := executeRequest(mux, reqEq)
 
-		var eq entity.Equipment
-		json.Unmarshal(rrEq.Body.Bytes(), &eq)
+		var equipmentResponse SuccessResponse[entity.Equipment]
+		err := json.Unmarshal(rrEq.Body.Bytes(), &equipmentResponse)
+		assert.NoError(t, err)
 
 		// Привязываем к эксперименту
-		linkPayload := []byte(fmt.Sprintf(`{"equipment_id": %d}`, eq.ID))
+		linkPayload := []byte(fmt.Sprintf(`{"equipment_id": %d}`, equipmentResponse.Data.ID))
 		linkURL := fmt.Sprintf("/experiment/%d/equipment", expID)
 		reqLink, _ := http.NewRequest("POST", linkURL, bytes.NewBuffer(linkPayload))
 		reqLink.Header.Set("Content-Type", "application/json")

@@ -36,13 +36,20 @@ func (h *EquipmentHandler) Create(w http.ResponseWriter, r *http.Request) {
 	// NOTE: rename to just "e".
 	var equipment entity.Equipment
 	err := json.NewDecoder(r.Body).Decode(&equipment)
-	equipment.CreationDate = time.Now().UTC().Format(time.RFC3339)
-
 	if err != nil {
 		log.Printf("ERROR: [EquipmentHandler.Create] failed to decode JSON: %v", err)
-		InternalServerErrorHandler(w, r)
+		BadRequestHandler(w, "invalid request body")
 		return
 	}
+
+	equipment.Name, equipment.Description, err = normalizeAndValidatePayload(equipment.Name, equipment.Description)
+	if err != nil {
+		log.Printf("ERROR: [EquipmentHandler.Create] validation failed: %v", err)
+		ValidationErrorHandler(w, err.Error())
+		return
+	}
+
+	equipment.CreationDate = time.Now().UTC().Format(time.RFC3339)
 
 	id, err := h.store.Add(equipment)
 	if err != nil {
@@ -56,9 +63,7 @@ func (h *EquipmentHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	equipment.ID = id
 
-	w.WriteHeader(http.StatusCreated)
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(equipment)
+	writeJSONResponse(w, http.StatusCreated, equipment)
 }
 
 // Получение всех записей из бд.
@@ -67,7 +72,7 @@ func (h *EquipmentHandler) List(w http.ResponseWriter, r *http.Request) {
 		filename := "all_equipment.csv"
 		if err := h.store.ExportAllToFile(filename); err != nil {
 			log.Printf("ERROR: [EquipmentHandler.List] failed to export CSV to %s: %v", filename, err)
-			http.Error(w, err.Error(), 500)
+			InternalServerErrorHandler(w, r)
 			return
 		}
 		serveCSV(w, r, filename) // Вынес отправку в отдельный метод для чистоты
@@ -86,16 +91,7 @@ func (h *EquipmentHandler) List(w http.ResponseWriter, r *http.Request) {
 		equipmentList = append(equipmentList, eq)
 	}
 
-	jsonBytes, err := json.Marshal(equipmentList)
-	if err != nil {
-		log.Printf("ERROR: [EquipmentHandler.List] failed to marshal JSON: %v", err)
-		InternalServerErrorHandler(w, r)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	w.Write(jsonBytes)
+	writeJSONResponse(w, http.StatusOK, equipmentList)
 }
 
 // Получение
@@ -112,7 +108,7 @@ func (h *EquipmentHandler) Get(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		// TODO: Log later.
 		log.Printf("ERROR: [EquipmentHandler.Get] invalid ID format '%s': %v", matches[1], err)
-		http.Error(w, "Invalid ID format", http.StatusBadRequest)
+		BadRequestHandler(w, "invalid ID format")
 		return
 	}
 
@@ -129,16 +125,7 @@ func (h *EquipmentHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	jsonBytes, err := json.Marshal(equipment)
-	if err != nil {
-		log.Printf("ERROR: [EquipmentHandler.Get] failed to marshal JSON for ID %d: %v", id, err)
-		InternalServerErrorHandler(w, r)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	w.Write(jsonBytes)
+	writeJSONResponse(w, http.StatusOK, equipment)
 }
 
 func (h *EquipmentHandler) Update(w http.ResponseWriter, r *http.Request) {
@@ -154,14 +141,21 @@ func (h *EquipmentHandler) Update(w http.ResponseWriter, r *http.Request) {
 	err := json.NewDecoder(r.Body).Decode(&equipment)
 	if err != nil {
 		log.Printf("ERROR: [EquipmentHandler.Update] failed to decode JSON: %v", err)
-		InternalServerErrorHandler(w, r)
+		BadRequestHandler(w, "invalid request body")
+		return
+	}
+
+	equipment.Name, equipment.Description, err = normalizeAndValidatePayload(equipment.Name, equipment.Description)
+	if err != nil {
+		log.Printf("ERROR: [EquipmentHandler.Update] validation failed: %v", err)
+		ValidationErrorHandler(w, err.Error())
 		return
 	}
 
 	id, err := strconv.Atoi(matches[1])
 	if err != nil {
 		log.Printf("ERROR: [EquipmentHandler.Update] invalid ID format '%s': %v", matches[1], err)
-		http.Error(w, "Invalid ID format", http.StatusBadRequest)
+		BadRequestHandler(w, "invalid ID format")
 		return
 	}
 
@@ -176,8 +170,15 @@ func (h *EquipmentHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	updatedEquipment, err := h.store.Get(id)
+	if err != nil {
+		log.Printf("ERROR: [EquipmentHandler.Update] failed to fetch updated equipment ID %d: %v", id, err)
+		InternalServerErrorHandler(w, r)
+		return
+	}
+
 	log.Printf("INFO: [EquipmentHandler.Update] successfully updated equipment ID %d", id)
-	w.WriteHeader(http.StatusOK)
+	writeJSONResponse(w, http.StatusOK, updatedEquipment)
 }
 
 func (h *EquipmentHandler) Delete(w http.ResponseWriter, r *http.Request) {
@@ -191,7 +192,7 @@ func (h *EquipmentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(matches[1])
 	if err != nil {
 		log.Printf("ERROR: [EquipmentHandler.Delete] invalid ID format '%s': %v", matches[1], err)
-		http.Error(w, "Invalid ID format", http.StatusBadRequest)
+		BadRequestHandler(w, "invalid ID format")
 		return
 	}
 
