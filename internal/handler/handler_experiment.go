@@ -138,7 +138,7 @@ func (h *ExperimentHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var experimentList []entity.Experiment
+	experimentList := make([]entity.Experiment, 0, len(experimentMap))
 	for _, eq := range experimentMap {
 		experimentList = append(experimentList, eq)
 	}
@@ -349,7 +349,7 @@ func (h *ExperimentHandler) ListEquipment(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	var equipmentList []entity.Equipment
+	equipmentList := make([]entity.Equipment, 0, len(equipmentMap))
 	for _, eq := range equipmentMap {
 		equipmentList = append(equipmentList, eq)
 	}

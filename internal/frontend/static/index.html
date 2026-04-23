@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lab Inventory</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="page-shell">
+    <header class="hero">
+      <div class="hero-copyblock">
+        <p class="eyebrow">Go REST CRUD</p>
+        <h1>Lab Inventory</h1>
+        <p class="hero-copy">
+          A small control panel for equipment, experiments, and CSV exports.
+        </p>
+      </div>
+      <div class="hero-actions">
+        <button id="theme-toggle" class="ghost-button" type="button">Dark Theme</button>
+        <button id="refresh-all" class="ghost-button" type="button">Refresh</button>
+      </div>
+    </header>
+
+    <div id="app-message" class="message hidden" role="status" aria-live="polite"></div>
+
+    <main class="dashboard">
+      <section class="panel panel-compact">
+        <div class="panel-header simple-header">
+          <div>
+            <p class="panel-kicker">Create</p>
+            <h2>Equipment</h2>
+          </div>
+        </div>
+        <form id="equipment-form" class="stack">
+          <label class="field">
+            <span>Name</span>
+            <input id="equipment-name" name="name" type="text" maxlength="150" required>
+          </label>
+          <label class="field">
+            <span>Description</span>
+            <textarea id="equipment-description" name="description" rows="4" maxlength="1000"></textarea>
+          </label>
+          <button class="primary-button" type="submit">Add Equipment</button>
+        </form>
+      </section>
+
+      <section class="panel panel-compact">
+        <div class="panel-header simple-header">
+          <div>
+            <p class="panel-kicker">Create</p>
+            <h2>Experiments</h2>
+          </div>
+        </div>
+        <form id="experiment-form" class="stack">
+          <label class="field">
+            <span>Name</span>
+            <input id="experiment-name" name="name" type="text" maxlength="150" required>
+          </label>
+          <label class="field">
+            <span>Description</span>
+            <textarea id="experiment-description" name="description" rows="4" maxlength="1000"></textarea>
+          </label>
+          <button class="primary-button" type="submit">Add Experiment</button>
+        </form>
+      </section>
+
+      <section class="panel panel-wide list-panel">
+        <div class="panel-header">
+          <div>
+            <p class="panel-kicker">Browse</p>
+            <h2>Equipment</h2>
+          </div>
+          <div class="panel-actions">
+            <a class="ghost-button export-link" href="/equipment?format=csv">Export CSV</a>
+            <span id="equipment-count" class="count-badge">0 items</span>
+          </div>
+        </div>
+        <div id="equipment-list" class="card-grid empty-state">No equipment yet.</div>
+      </section>
+
+      <section class="panel panel-wide list-panel">
+        <div class="panel-header">
+          <div>
+            <p class="panel-kicker">Browse</p>
+            <h2>Experiments</h2>
+          </div>
+          <div class="panel-actions">
+            <a class="ghost-button export-link" href="/experiments?format=csv">Export CSV</a>
+            <span id="experiment-count" class="count-badge">0 items</span>
+          </div>
+        </div>
+        <div id="experiment-list" class="card-grid empty-state">No experiments yet.</div>
+      </section>
+    </main>
+  </div>
+
+  <template id="equipment-card-template">
+    <article class="card">
+      <div class="card-topline">Equipment</div>
+      <h3 class="card-title"></h3>
+      <p class="card-copy"></p>
+      <p class="card-meta"></p>
+      <div class="card-actions">
+        <button class="ghost-button card-edit" type="button">Edit</button>
+        <button class="danger-button card-delete" type="button">Delete</button>
+      </div>
+    </article>
+  </template>
+
+  <template id="experiment-card-template">
+    <article class="card experiment-card">
+      <div class="card-topline">Experiment</div>
+      <h3 class="card-title"></h3>
+      <p class="card-copy"></p>
+      <p class="card-meta"></p>
+
+      <form class="link-form">
+        <label class="field compact-field">
+          <span>Attach equipment</span>
+          <select class="equipment-select"></select>
+        </label>
+        <button class="primary-button" type="submit">Attach</button>
+      </form>
+
+      <div>
+        <p class="subheading">Assigned Equipment</p>
+        <div class="linked-equipment-list empty-inline">No equipment assigned.</div>
+      </div>
+
+      <div class="card-actions">
+        <a class="ghost-button export-link experiment-export" href="#">Export CSV</a>
+        <button class="ghost-button card-edit" type="button">Edit</button>
+        <button class="danger-button card-delete" type="button">Delete</button>
+      </div>
+    </article>
+  </template>
+
+  <script src="/static/app.js" defer></script>
+</body>
+</html>

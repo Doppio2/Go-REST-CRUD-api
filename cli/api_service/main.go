@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"go_rest_crud/internal/config"
+	"go_rest_crud/internal/frontend"
 	"go_rest_crud/internal/handler"
 	"go_rest_crud/internal/repo/sqlite"
 )
@@ -57,7 +58,8 @@ func main() {
 
 	mux := http.NewServeMux()
 
-	mux.Handle("/", &handler.HomeHandler{})
+	mux.Handle("/", frontend.IndexHandler())
+	mux.Handle("/static/", http.StripPrefix("/static/", frontend.StaticHandler()))
 	mux.Handle("/equipment", equipmentHandler)
 	mux.Handle("/equipment/", equipmentHandler)
 
