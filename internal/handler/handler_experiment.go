@@ -1,33 +1,33 @@
 package handler
 
 import (
+	"encoding/json"
 	"fmt"
-	"time"
+	"log"
 	"net/http"
 	"regexp"
-	"encoding/json"
-	"log"
-	"strings"
 	"strconv"
+	"strings"
+	"time"
 
-	"go_rest_crud/internal/repo"
 	"go_rest_crud/internal/entity"
+	"go_rest_crud/internal/repo"
 )
 
 // Регулярные выражения для обращения к страницам с определенным оборудованием и к техникe с этим оборудованием.
 var (
-	ExperimentRe                = regexp.MustCompile(`^/experiment/?$`)
-	ExperimentReWithID          = regexp.MustCompile(`^/experiment/([0-9]+)$`)
-	ExperimentEquipmentRe       = regexp.MustCompile(`^/experiment/([0-9]+)/equipment/?$`)
-	ExperimentEquipmentReWithID = regexp.MustCompile(`^/experiment/([0-9]+)/equipment/([0-9]+)$`)
+	ExperimentRe                = regexp.MustCompile(`^/experiments?/?$`)
+	ExperimentReWithID          = regexp.MustCompile(`^/experiments?/([0-9]+)$`)
+	ExperimentEquipmentRe       = regexp.MustCompile(`^/experiments?/([0-9]+)/equipment/?$`)
+	ExperimentEquipmentReWithID = regexp.MustCompile(`^/experiments?/([0-9]+)/equipment/([0-9]+)$`)
 )
 
 // Ручка для сущности Equipment.
 type ExperimentHandler struct {
 	// TODO: Слишком большие названия. Не лучше ли сделать сокращения EStore, EXStore и EEStore????
-	ExperimentStore               repo.ExperimentStore
-	EquipmentStore                repo.EquipmentStore
-	ExperimentEquipmentStore      repo.ExperimentEquipmentStore
+	ExperimentStore          repo.ExperimentStore
+	EquipmentStore           repo.EquipmentStore
+	ExperimentEquipmentStore repo.ExperimentEquipmentStore
 }
 
 func GetExperimentID(w http.ResponseWriter, r *http.Request) (int, error) {
@@ -71,14 +71,14 @@ func GetEquipmentID(w http.ResponseWriter, r *http.Request) (int, error) {
 }
 
 // Конструктор для ручки Experiment.
-func NewExperimentHandler(experimentStore repo.ExperimentStore, 
-                          equipmentStore repo.EquipmentStore,
-                          experimentEquipmentStore repo.ExperimentEquipmentStore,
-					      ) *ExperimentHandler {
-	return &ExperimentHandler {
-		ExperimentStore: experimentStore,
-		EquipmentStore: equipmentStore,
-		ExperimentEquipmentStore: experimentEquipmentStore, 
+func NewExperimentHandler(experimentStore repo.ExperimentStore,
+	equipmentStore repo.EquipmentStore,
+	experimentEquipmentStore repo.ExperimentEquipmentStore,
+) *ExperimentHandler {
+	return &ExperimentHandler{
+		ExperimentStore:          experimentStore,
+		EquipmentStore:           equipmentStore,
+		ExperimentEquipmentStore: experimentEquipmentStore,
 	}
 }
 
@@ -94,7 +94,7 @@ func (h *ExperimentHandler) Create(w http.ResponseWriter, r *http.Request) {
 		// TODO: Pass errors to the InternalServerErorHandler function.
 		log.Printf("ERROR: [ExperimentHandler.Create] failed to decode JSON: %v", err)
 		InternalServerErrorHandler(w, r)
-		return 
+		return
 	}
 
 	id, err := h.ExperimentStore.Add(experiment)
@@ -110,7 +110,7 @@ func (h *ExperimentHandler) Create(w http.ResponseWriter, r *http.Request) {
 	log.Printf("INFO: [ExperimentHandler.Create] successfully created experiment with ID %d", id)
 
 	w.Header().Set("Content-Type", "application/json") // <-- Сначала заголовки
-	w.WriteHeader(http.StatusCreated)                 // <-- Потом статус
+	w.WriteHeader(http.StatusCreated)                  // <-- Потом статус
 	json.NewEncoder(w).Encode(experiment)
 }
 
@@ -127,28 +127,28 @@ func (h *ExperimentHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-    experimentMap, err := h.ExperimentStore.List()
-    if err != nil {
+	experimentMap, err := h.ExperimentStore.List()
+	if err != nil {
 		log.Printf("ERROR: [ExperimentHandler.List] database error: %v", err)
 		InternalServerErrorHandler(w, r)
 		return
-    }
+	}
 
-    var experimentList []entity.Experiment
-    for _, eq := range experimentMap {
-        experimentList = append(experimentList, eq)
-    }
+	var experimentList []entity.Experiment
+	for _, eq := range experimentMap {
+		experimentList = append(experimentList, eq)
+	}
 
-    jsonBytes, err := json.Marshal(experimentList)
-    if err != nil {
+	jsonBytes, err := json.Marshal(experimentList)
+	if err != nil {
 		log.Printf("ERROR: [ExperimentHandler.List] failed to marshal JSON: %v", err)
 		InternalServerErrorHandler(w, r)
 		return
-    }
+	}
 
-    w.Header().Set("Content-Type", "application/json")
-    w.WriteHeader(http.StatusOK)
-    w.Write(jsonBytes)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(jsonBytes)
 }
 
 func (h *ExperimentHandler) Get(w http.ResponseWriter, r *http.Request) {
@@ -164,10 +164,10 @@ func (h *ExperimentHandler) Get(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("ERROR: [ExperimentHandler.Get] invalid ID format '%s': %v", matches[1], err)
 		http.Error(w, "Invalid ID format", http.StatusBadRequest)
+		return
 	}
 
 	experiment, err := h.ExperimentStore.Get(id)
-	fmt.Println(experiment)
 	if err != nil {
 		if err == repo.NotFoundErr {
 			log.Printf("INFO: [ExperimentHandler.Get] experiment with ID %d not found", id)
@@ -176,7 +176,7 @@ func (h *ExperimentHandler) Get(w http.ResponseWriter, r *http.Request) {
 			log.Printf("ERROR: [ExperimentHandler.Get] database error for ID %d: %v", id, err)
 			InternalServerErrorHandler(w, r)
 		}
-		
+
 		return
 	}
 
@@ -186,76 +186,85 @@ func (h *ExperimentHandler) Get(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("ERROR: [ExperimentHandler.Get] failed to marshal JSON for ID %d: %v", id, err)
 		InternalServerErrorHandler(w, r)
+		return
 	}
 
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	w.Write(jsonBytes)
 }
 
 func (h *ExperimentHandler) Update(w http.ResponseWriter, r *http.Request) {
-    matches := ExperimentReWithID.FindStringSubmatch(r.URL.Path)
-    if len(matches) < 2 {
+	matches := ExperimentReWithID.FindStringSubmatch(r.URL.Path)
+	if len(matches) < 2 {
 		log.Printf("ERROR: [ExperimentHandler.Update] missing ID in path: %s", r.URL.Path)
 		InternalServerErrorHandler(w, r)
 		return
-    }
+	}
 
-    var experiment entity.Experiment
-	
-    err := json.NewDecoder(r.Body).Decode(&experiment)
+	var experiment entity.Experiment
+
+	err := json.NewDecoder(r.Body).Decode(&experiment)
 	if err != nil {
 		log.Printf("ERROR: [ExperimentHandler.Update] failed to decode JSON: %v", err)
-        InternalServerErrorHandler(w, r)
-        return
-    }
+		InternalServerErrorHandler(w, r)
+		return
+	}
 
 	id, err := strconv.Atoi(matches[1])
 	if err != nil {
 		log.Printf("ERROR: [ExperimentHandler.Update] invalid ID format '%s': %v", matches[1], err)
 		http.Error(w, "Invalid ID format", http.StatusBadRequest)
+		return
 	}
 
-    if err := h.ExperimentStore.Update(id, experiment); err != nil {
-        if err == repo.NotFoundErr {
+	if err := h.ExperimentStore.Update(id, experiment); err != nil {
+		if err == repo.NotFoundErr {
 			log.Printf("INFO: [ExperimentHandler.Update] experiment with ID %d not found for update", id)
-            NotFoundHandler(w, r)
-            return
-        }
+			NotFoundHandler(w, r)
+			return
+		}
 		log.Printf("ERROR: [ExperimentHandler.Update] database error for ID %d: %v", id, err)
-        InternalServerErrorHandler(w, r)
-        return
-    }
+		InternalServerErrorHandler(w, r)
+		return
+	}
 
 	log.Printf("INFO: [ExperimentHandler.Update] successfully updated experiment ID %d", id)
 	w.WriteHeader(http.StatusOK)
 }
 
 func (h *ExperimentHandler) Delete(w http.ResponseWriter, r *http.Request) {
-    matches := ExperimentReWithID.FindStringSubmatch(r.URL.Path)
-    if len(matches) < 2 {
+	matches := ExperimentReWithID.FindStringSubmatch(r.URL.Path)
+	if len(matches) < 2 {
 		log.Printf("ERROR: [ExperimentHandler.Delete] missing ID in path: %s", r.URL.Path)
 		InternalServerErrorHandler(w, r)
 		return
-    }
+	}
 
 	id, err := strconv.Atoi(matches[1])
 	if err != nil {
-		// TODO: Log later.
 		log.Printf("ERROR: [ExperimentHandler.Delete] invalid ID format '%s': %v", matches[1], err)
-		log.Fatal("Can't get element ID: ", err)
+		http.Error(w, "Invalid ID format", http.StatusBadRequest)
+		return
 	}
 
-    if err := h.ExperimentStore.Remove(id); err != nil {
+	if err := h.ExperimentStore.Remove(id); err != nil {
+		if err == repo.NotFoundErr {
+			log.Printf("INFO: [ExperimentHandler.Delete] experiment with ID %d not found", id)
+			NotFoundHandler(w, r)
+			return
+		}
+
 		log.Printf("ERROR: [ExperimentHandler.Delete] database error for ID %d: %v", id, err)
 		InternalServerErrorHandler(w, r)
 		return
-    }
+	}
 
 	log.Printf("INFO: [ExperimentHandler.Delete] successfully removed experiment ID %d", id)
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// Добавление оборудование к эксперименту. 
+// Добавление оборудование к эксперименту.
 func (h *ExperimentHandler) AddEquipment(w http.ResponseWriter, r *http.Request) {
 	experimentID, err := GetExperimentID(w, r)
 	if err != nil {
@@ -263,14 +272,25 @@ func (h *ExperimentHandler) AddEquipment(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	if _, err := h.ExperimentStore.Get(experimentID); err != nil {
+		if err == repo.NotFoundErr {
+			NotFoundHandler(w, r)
+			return
+		}
+
+		InternalServerErrorHandler(w, r)
+		return
+	}
+
 	// Ищем оборудование по полученному из запроса id.
 	var payload struct {
-        EquipmentID int `json:"equipment_id"`
+		EquipmentID int `json:"equipment_id"`
 	}
 	err = json.NewDecoder(r.Body).Decode(&payload)
 	if err != nil {
 		log.Printf("ERROR: [ExperimentHandler.AddEquipment] failed to decode JSON payload: %v", err)
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
 	}
 
 	equipment, err := h.EquipmentStore.Get(payload.EquipmentID)
@@ -285,12 +305,12 @@ func (h *ExperimentHandler) AddEquipment(w http.ResponseWriter, r *http.Request)
 	if err != nil {
 		log.Printf("ERROR: [ExperimentHandler.AddEquipment] failed to link experiment %d and equipment %d: %v", experimentID, payload.EquipmentID, err)
 		http.Error(w, "Failed to add equipment to experiment", http.StatusInternalServerError)
-        return
+		return
 	}
 
 	// TODO: возможно стоит лучше поставить http.StatusCreated.
 	log.Printf("INFO: [ExperimentHandler.AddEquipment] successfully linked equipment %d to experiment %d", payload.EquipmentID, experimentID)
-    w.WriteHeader(http.StatusCreated)
+	w.WriteHeader(http.StatusCreated)
 }
 
 // Получения списка всего оборудования, которое используется в эксперименте.
@@ -325,22 +345,22 @@ func (h *ExperimentHandler) ListEquipment(w http.ResponseWriter, r *http.Request
 
 	var equipmentList []entity.Equipment
 	for _, eq := range equipmentMap {
-		equipmentList = append(equipmentList , eq)
+		equipmentList = append(equipmentList, eq)
 	}
 
-    jsonBytes, err := json.Marshal(equipmentList)
-    if err != nil {
+	jsonBytes, err := json.Marshal(equipmentList)
+	if err != nil {
 		log.Printf("ERROR: [ExperimentHandler.ListEquipment] failed to marshal JSON for experiment %d: %v", experimentID, err)
 		InternalServerErrorHandler(w, r)
-        return
-    }
+		return
+	}
 
 	log.Printf("INFO: [ExperimentHandler.ListEquipment] returned %d items for experiment %d", len(equipmentList), experimentID)
 
 	// TODO: Возможно стоит выделить это в отдельную функцию.
-    w.Header().Set("Content-Type", "application/json")
-    w.WriteHeader(http.StatusOK)
-    w.Write(jsonBytes)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(jsonBytes)
 }
 
 func (h *ExperimentHandler) GetEquipment(w http.ResponseWriter, r *http.Request) {
@@ -355,14 +375,13 @@ func (h *ExperimentHandler) GetEquipment(w http.ResponseWriter, r *http.Request)
 	}
 
 	/*
-	equipment, err := h.ExperimentEquipmentStore.GetEquipment(equipmentID, experimentID)
-	if err != nil {
-		NotFoundHandler(w, r)
-		return
-	}
+		equipment, err := h.ExperimentEquipmentStore.GetEquipment(experimentID, equipmentID)
+		if err != nil {
+			NotFoundHandler(w, r)
+			return
+		}
 	*/
-	// TODO(denis): check if new version working.
-	equipment, err := h.ExperimentEquipmentStore.GetEquipment(equipmentID, experimentID)
+	equipment, err := h.ExperimentEquipmentStore.GetEquipment(experimentID, equipmentID)
 	if err != nil {
 		if err == repo.NotFoundErr {
 			log.Printf("INFO: [ExperimentHandler.GetEquipment] equipment %d not found in experiment %d", equipmentID, experimentID)
@@ -395,15 +414,15 @@ func (h *ExperimentHandler) DeleteEquipment(w http.ResponseWriter, r *http.Reque
 	err = h.ExperimentEquipmentStore.Remove(experimentID, equipmentID)
 
 	/*
-	if err == repo.NotFoundErr { // <-- 1. Сначала проверяем 404
-		http.Error(w, "Experiment equipment link not found", http.StatusNotFound)
-		return
-	}
-	if err != nil { // <-- 2. Затем проверяем другие ошибки (500)
-		// Используйте InternalServerErrorHandler или явно 500
-		http.Error(w, "Failed to delete equipment from experiment", http.StatusInternalServerError)
-		return
-	}
+		if err == repo.NotFoundErr { // <-- 1. Сначала проверяем 404
+			http.Error(w, "Experiment equipment link not found", http.StatusNotFound)
+			return
+		}
+		if err != nil { // <-- 2. Затем проверяем другие ошибки (500)
+			// Используйте InternalServerErrorHandler или явно 500
+			http.Error(w, "Failed to delete equipment from experiment", http.StatusInternalServerError)
+			return
+		}
 	*/
 
 	if err != nil {
@@ -429,7 +448,7 @@ func (h *ExperimentHandler) DeleteEquipment(w http.ResponseWriter, r *http.Reque
 
 func (h *ExperimentHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
-		// -- Операции, связанные с экспериментами.
+	// -- Операции, связанные с экспериментами.
 	case r.Method == http.MethodPost && ExperimentRe.MatchString(r.URL.Path):
 		h.Create(w, r)
 		return
@@ -454,7 +473,7 @@ func (h *ExperimentHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	case r.Method == http.MethodGet && ExperimentEquipmentReWithID.MatchString(r.URL.Path):
 		h.GetEquipment(w, r)
-		return 
+		return
 	case r.Method == http.MethodDelete && ExperimentEquipmentReWithID.MatchString(r.URL.Path):
 		h.DeleteEquipment(w, r)
 		return

@@ -1,87 +1,29 @@
 package main
 
 import (
-	"log"
 	"fmt"
+	"log"
 	"net/http"
-	"database/sql"
 
-    _ "github.com/glebarez/go-sqlite"
-	
 	"go_rest_crud/internal/handler"
-//  "go_rest_crud/internal/repo"
 	"go_rest_crud/internal/repo/sqlite"
 )
 
-/* 
+/*
 TODO LIST:
   Нужно выдавать пользователям выходной документ с табличкой, где будет показано время, кол-во чего-то и т.д
   Нужно это продумать. Но этим я займусь завтра.
   Нужно не тянуть, а то времени немного.
 */
 
-// TODO: это нужно перенести в файлы миграции (Я ток не знаю, можно ли так делать в sqlite или это внутри кода надо делать) sql.
-// Либо в отдельный файл .go файл.
-func CreateTables(db *sql.DB) {
-	// Таблица для оборудования.
-	sqlCreateTable := `
-	CREATE TABLE IF NOT EXISTS equipment (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		name TEXT NOT NULL,
-		description TEXT,
-		creation_date TEXT NOT NULL
-	);`
-	_, err := db.Exec(sqlCreateTable)
-	if err != nil {
-		log.Fatal("Can't create table \"equipment\": ", err)
-	}
-	fmt.Println("Table \"equipment\" was created successfully.")
-
-	// Таблица для эксперимента.
-	sqlCreateTable = `
-	CREATE TABLE IF NOT EXISTS experiment (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		name TEXT NOT NULL,
-		description TEXT,
-		creation_date TEXT NOT NULL
-	);`
-	_, err = db.Exec(sqlCreateTable)
-	if err != nil {
-		log.Fatal("Can't create table experiment: ", err)
-	}
-	fmt.Println("Table \"experiment\" was created successfully.")
-
-	// Объединенная таблица.
-	sqlCreateTable = `
-	CREATE TABLE IF NOT EXISTS experiment_equipment(
-		experiment_id INTEGER NOT NULL,
-		equipment_id INTEGER NOT NULL,
-		PRIMARY KEY (experiment_id, equipment_id),
-		FOREIGN KEY (experiment_id) REFERENCES experiment(id),
-		FOREIGN KEY (equipment_id) REFERENCES equipment(id)
-	);`
-	_, err = db.Exec(sqlCreateTable)
-	if err != nil {
-		log.Fatal("Can't create table experiment_equipment: ", err)
-	}
-	fmt.Println("Table \"experiment_equipment\" was created successfully.")
-}
-
 func main() {
-	// -- Подключение базы данных sqlite. -- 
-	// TODO: Позже нужно будет создавать файл с бд.
-	// Пока что я использую :memory параметр, что хранит всю бд в оперативной памяти.
-	// sql.Open("sqlite", "db/equipment.db")
-	db, err := sql.Open("sqlite", ":memory:")
+	db, dbPath, err := sqlite.OpenDatabase()
 	if err != nil {
 		log.Fatal("Can't connect to a data base: ", err)
 	}
 	defer db.Close()
-    fmt.Println("Connected to the SQLite database successfully.")
-	// ----
+	fmt.Printf("Connected to the SQLite database successfully: %s\n", dbPath)
 
-	// -- Проверка работоспособности пакета и вывод версии. --
-	// NOTE: наверное, в релизной версии стоит это убрать.
 	var sqliteVersion string
 
 	err = db.QueryRow("select sqlite_version()").Scan(&sqliteVersion)
@@ -90,42 +32,35 @@ func main() {
 	}
 	fmt.Println("SQLite version: ", sqliteVersion)
 
-	CreateTables(db) // Создание необходимых таблиц.
-	// ----
+	if err := sqlite.Migrate(db); err != nil {
+		log.Fatal("Can't migrate database schema: ", err)
+	}
 
-	// -- Создание хранилищ для операций с БД --.
-	// Repo - интерфейс содержащий все операции для работы с бд.
 	sqliteEquipmentStore := sqlite.NewSQLiteEquipmentStore(db)
 	sqliteExperimentStore := sqlite.NewSQLiteExperimentStore(db)
-	// TODO: Я не знаю, нужно ли создавать отдельную таблицу для связи.
-	// Скорее всего это плохая идея, но кто его знает. Мне может понадобится, если я захочу еще какое-нибудь поле добавить.
-	// Поэтому пускай будет. Это довольно легко можно будет соединить с хранилищем ExperimentStore.
 	sqliteExperimentEquipmentStore := sqlite.NewSQLiteExperimentEquipmentStore(db)
-	// --- 
 
-	// -- Создаем ручку и подключение к http серверу и связываем все это между собой. --
-	// TODO: Если я захочу реализовать метод ListExperiments(equipmentId), то мне нужно будет передавать еще и sqliteExperimentStore для доступа к методам.
-	// С другой стороны, зачем мне вообще передавать их в ручку? Я могу просто напрямую запрос написать.
-	// Т.к доступ к базе данных есть. Так у меня получается мега тупая инкапсуляция какая-то. Я бы от этого избавился.
 	equipmentHandler := handler.NewEquipmentHandler(sqliteEquipmentStore)
-	experimentHandler := handler.NewExperimentHandler(sqliteExperimentStore, 
-	                                                  sqliteEquipmentStore, 
-													  sqliteExperimentEquipmentStore)
+	experimentHandler := handler.NewExperimentHandler(
+		sqliteExperimentStore,
+		sqliteEquipmentStore,
+		sqliteExperimentEquipmentStore,
+	)
 
 	mux := http.NewServeMux()
-	
+
 	mux.Handle("/", &handler.HomeHandler{})
 	mux.Handle("/equipment", equipmentHandler)
 	mux.Handle("/equipment/", equipmentHandler)
 
-	// TODO: реализовать оставшиеся ручки.
-	mux.Handle("/experiments", experimentHandler)            // Для взаимодействия со всем списком экспериментов.
-	mux.Handle("/experiment/", experimentHandler)            // Для взаимодействия со определенным экспериментом.
+	mux.Handle("/experiment", experimentHandler)
+	mux.Handle("/experiment/", experimentHandler)
+	mux.Handle("/experiments", experimentHandler)
+	mux.Handle("/experiments/", experimentHandler)
 
 	err = http.ListenAndServe(":8080", mux)
 
 	if err != nil {
 		log.Fatal("Can't start a server:", err)
 	}
-	// ----
 }

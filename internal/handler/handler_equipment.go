@@ -3,19 +3,19 @@ package handler
 import (
 	"time"
 	//"fmt"
-	"net/http"
-	"regexp"
 	"encoding/json"
 	"log"
+	"net/http"
+	"regexp"
 	"strconv"
 
-	"go_rest_crud/internal/repo"
 	"go_rest_crud/internal/entity"
+	"go_rest_crud/internal/repo"
 )
 
 // Регулярные выражения для обращения к страницам с определенным оборудованием.
 var (
-	EquipmentRe = regexp.MustCompile(`^/equipment/?$`)
+	EquipmentRe       = regexp.MustCompile(`^/equipment/?$`)
 	EquipmentReWithID = regexp.MustCompile(`^/equipment/([0-9]+)$`)
 )
 
@@ -26,7 +26,7 @@ type EquipmentHandler struct {
 
 // Конструктор для ручки Equipment.
 func NewEquipmentHandler(s repo.EquipmentStore) *EquipmentHandler {
-	return &EquipmentHandler {
+	return &EquipmentHandler{
 		store: s,
 	}
 }
@@ -41,7 +41,7 @@ func (h *EquipmentHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("ERROR: [EquipmentHandler.Create] failed to decode JSON: %v", err)
 		InternalServerErrorHandler(w, r)
-		return 
+		return
 	}
 
 	id, err := h.store.Add(equipment)
@@ -74,31 +74,31 @@ func (h *EquipmentHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-    equipmentMap, err := h.store.List()
-    if err != nil {
+	equipmentMap, err := h.store.List()
+	if err != nil {
 		log.Printf("ERROR: [EquipmentHandler.List] database error: %v", err)
-        InternalServerErrorHandler(w, r)
-        return
-    }
+		InternalServerErrorHandler(w, r)
+		return
+	}
 
-    var equipmentList []entity.Equipment
-    for _, eq := range equipmentMap {
-        equipmentList = append(equipmentList, eq)
-    }
+	var equipmentList []entity.Equipment
+	for _, eq := range equipmentMap {
+		equipmentList = append(equipmentList, eq)
+	}
 
-    jsonBytes, err := json.Marshal(equipmentList)
-    if err != nil {
+	jsonBytes, err := json.Marshal(equipmentList)
+	if err != nil {
 		log.Printf("ERROR: [EquipmentHandler.List] failed to marshal JSON: %v", err)
-        InternalServerErrorHandler(w, r)
-        return
-    }
+		InternalServerErrorHandler(w, r)
+		return
+	}
 
-    w.Header().Set("Content-Type", "application/json")
-    w.WriteHeader(http.StatusOK)
-    w.Write(jsonBytes)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(jsonBytes)
 }
 
-// Получение 
+// Получение
 func (h *EquipmentHandler) Get(w http.ResponseWriter, r *http.Request) {
 	matches := EquipmentReWithID.FindStringSubmatch(r.URL.Path)
 
@@ -113,6 +113,7 @@ func (h *EquipmentHandler) Get(w http.ResponseWriter, r *http.Request) {
 		// TODO: Log later.
 		log.Printf("ERROR: [EquipmentHandler.Get] invalid ID format '%s': %v", matches[1], err)
 		http.Error(w, "Invalid ID format", http.StatusBadRequest)
+		return
 	}
 
 	equipment, err := h.store.Get(id)
@@ -124,7 +125,7 @@ func (h *EquipmentHandler) Get(w http.ResponseWriter, r *http.Request) {
 			log.Printf("ERROR: [EquipmentHandler.Get] database error for ID %d: %v", id, err)
 			InternalServerErrorHandler(w, r)
 		}
-		
+
 		return
 	}
 
@@ -132,71 +133,82 @@ func (h *EquipmentHandler) Get(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("ERROR: [EquipmentHandler.Get] failed to marshal JSON for ID %d: %v", id, err)
 		InternalServerErrorHandler(w, r)
+		return
 	}
 
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	w.Write(jsonBytes)
 }
 
 func (h *EquipmentHandler) Update(w http.ResponseWriter, r *http.Request) {
-    matches := EquipmentReWithID.FindStringSubmatch(r.URL.Path)
-    if len(matches) < 2 {
+	matches := EquipmentReWithID.FindStringSubmatch(r.URL.Path)
+	if len(matches) < 2 {
 		log.Printf("ERROR: [EquipmentHandler.Update] missing ID in path: %s", r.URL.Path)
 		InternalServerErrorHandler(w, r)
-        return
-    }
+		return
+	}
 
-    var equipment entity.Equipment
-	
-    err := json.NewDecoder(r.Body).Decode(&equipment)
+	var equipment entity.Equipment
+
+	err := json.NewDecoder(r.Body).Decode(&equipment)
 	if err != nil {
 		log.Printf("ERROR: [EquipmentHandler.Update] failed to decode JSON: %v", err)
 		InternalServerErrorHandler(w, r)
-        return
-    }
+		return
+	}
 
 	id, err := strconv.Atoi(matches[1])
 	if err != nil {
 		log.Printf("ERROR: [EquipmentHandler.Update] invalid ID format '%s': %v", matches[1], err)
-		log.Fatal("Can't get elemetn ID: ", err)
+		http.Error(w, "Invalid ID format", http.StatusBadRequest)
+		return
 	}
 
-    if err := h.store.Update(id, equipment); err != nil {
-        if err == repo.NotFoundErr {
+	if err := h.store.Update(id, equipment); err != nil {
+		if err == repo.NotFoundErr {
 			log.Printf("INFO: [EquipmentHandler.Update] attempt to update non-existent ID %d", id)
-            NotFoundHandler(w, r)
-            return
-        }
+			NotFoundHandler(w, r)
+			return
+		}
 		log.Printf("ERROR: [EquipmentHandler.Update] database error for ID %d: %v", id, err)
 		InternalServerErrorHandler(w, r)
 		return
-    }
+	}
 
 	log.Printf("INFO: [EquipmentHandler.Update] successfully updated equipment ID %d", id)
-    w.WriteHeader(http.StatusOK)
+	w.WriteHeader(http.StatusOK)
 }
 
 func (h *EquipmentHandler) Delete(w http.ResponseWriter, r *http.Request) {
-    matches := EquipmentReWithID.FindStringSubmatch(r.URL.Path)
-    if len(matches) < 2 {
+	matches := EquipmentReWithID.FindStringSubmatch(r.URL.Path)
+	if len(matches) < 2 {
 		log.Printf("ERROR: [EquipmentHandler.Delete] missing ID in path: %s", r.URL.Path)
-        InternalServerErrorHandler(w, r)
-        return
-    }
+		InternalServerErrorHandler(w, r)
+		return
+	}
 
 	id, err := strconv.Atoi(matches[1])
 	if err != nil {
 		log.Printf("ERROR: [EquipmentHandler.Delete] invalid ID format '%s': %v", matches[1], err)
-		log.Fatal("Can't get element ID: ", err)
+		http.Error(w, "Invalid ID format", http.StatusBadRequest)
+		return
 	}
 
-    if err := h.store.Remove(id); err != nil {
+	if err := h.store.Remove(id); err != nil {
+		if err == repo.NotFoundErr {
+			log.Printf("INFO: [EquipmentHandler.Delete] equipment with ID %d not found", id)
+			NotFoundHandler(w, r)
+			return
+		}
+
 		log.Printf("ERROR: [EquipmentHandler.Delete] database error for ID %d: %v", id, err)
-        InternalServerErrorHandler(w, r)
-        return
-    }
-log.Printf("INFO: [EquipmentHandler.Delete] successfully removed equipment ID %d", id)
-    w.WriteHeader(http.StatusNoContent)
+		InternalServerErrorHandler(w, r)
+		return
+	}
+
+	log.Printf("INFO: [EquipmentHandler.Delete] successfully removed equipment ID %d", id)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // Обработка запросов.

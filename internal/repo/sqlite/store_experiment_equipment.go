@@ -1,16 +1,16 @@
 package sqlite
 
 import (
+	"database/sql"
+	"encoding/csv"
 	"fmt"
 	"os"
-	"encoding/csv"
 	"strconv"
-	"database/sql"
-//	"log"
+	//	"log"
 	_ "github.com/glebarez/go-sqlite"
 
-	"go_rest_crud/internal/repo"
 	"go_rest_crud/internal/entity"
+	"go_rest_crud/internal/repo"
 )
 
 type SQLiteExperimentEquipmentStore struct {
@@ -109,7 +109,7 @@ func (s *SQLiteExperimentEquipmentStore) ListExperiments(equipmentId int) (map[i
 	query := `
 	    SELECT experiment.id, experiment.name, experiment.description
 		FROM experiment
-		JOIN experiment_equipment ON experiment_equipment.experiment_id = experiment.id  
+		JOIN experiment_equipment ON experiment_equipment.experiment_id = experiment.id
 		WHERE experiment_equipment.equipment_id = ?
 	`
 

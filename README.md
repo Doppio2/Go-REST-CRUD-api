@@ -31,3 +31,28 @@ The primary goal of this project is to demonstrate competency in fundamental bac
 
 ```bash
 go run ./cli/api_service/main.go
+```
+
+### Database Migrations
+
+Migrations are managed with `goose` and embedded into the Go binaries.
+
+Apply all pending migrations:
+
+```bash
+go run ./cli/migrate up
+```
+
+Show migration status:
+
+```bash
+go run ./cli/migrate status
+```
+
+Roll back the latest migration:
+
+```bash
+go run ./cli/migrate down
+```
+
+The SQLite database path defaults to `db/go_rest_crud.db`. Override it with `SQLITE_PATH`.

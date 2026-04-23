@@ -1,18 +1,17 @@
 package sqlite
 
 import (
+	"database/sql"
+	"encoding/csv"
 	"fmt"
 	"os"
-	"encoding/csv"
 	"strconv"
-	"database/sql"
 
 	_ "github.com/glebarez/go-sqlite"
 
-	"go_rest_crud/internal/repo"
 	"go_rest_crud/internal/entity"
+	"go_rest_crud/internal/repo"
 )
-
 
 type SQLiteExperimentStore struct {
 	*sql.DB
@@ -26,10 +25,10 @@ func NewSQLiteExperimentStore(db *sql.DB) *SQLiteExperimentStore {
 }
 
 func (s *SQLiteExperimentStore) Add(ex entity.Experiment) (int, error) {
-    query := "INSERT INTO experiment (name, description, creation_date) VALUES (?, ?, ?)"
+	query := "INSERT INTO experiment (name, description, creation_date) VALUES (?, ?, ?)"
 
 	// Используем res для получения LastInsertID.
-	res, err := s.Exec(query, ex.Name, ex.Description, ex.CreationDate) 
+	res, err := s.Exec(query, ex.Name, ex.Description, ex.CreationDate)
 	if err != nil {
 		return 0, err
 	}
@@ -44,52 +43,61 @@ func (s *SQLiteExperimentStore) Add(ex entity.Experiment) (int, error) {
 
 // Метод для получения данных об эксперименте по ID.
 func (s *SQLiteExperimentStore) Get(id int) (entity.Experiment, error) {
-    var ex entity.Experiment
-    err := s.QueryRow("SELECT id, name, description, creation_date FROM experiment WHERE id = ?", id).
-        Scan(&ex.ID, &ex.Name, &ex.Description, &ex.CreationDate)
-    if err == sql.ErrNoRows {
-        return ex, repo.NotFoundErr
-    }
-    return ex, err
+	var ex entity.Experiment
+	err := s.QueryRow("SELECT id, name, description, creation_date FROM experiment WHERE id = ?", id).
+		Scan(&ex.ID, &ex.Name, &ex.Description, &ex.CreationDate)
+	if err == sql.ErrNoRows {
+		return ex, repo.NotFoundErr
+	}
+	return ex, err
 }
 
 // Метод для обновления данных об эксперименте.
 func (s *SQLiteExperimentStore) Update(id int, ex entity.Experiment) error {
-    _, err := s.Exec("UPDATE experiment SET name = ?, description = ? WHERE id = ?", ex.Name, ex.Description, id, )
-    return err
+	res, err := s.Exec("UPDATE experiment SET name = ?, description = ? WHERE id = ?", ex.Name, ex.Description, id)
+	if err != nil {
+		return err
+	}
+
+	count, _ := res.RowsAffected()
+	if count == 0 {
+		return repo.NotFoundErr
+	}
+
+	return nil
 }
 
 // Метод для получения списках всех экспериментов из базы данных.
 func (s *SQLiteExperimentStore) List() (map[int]entity.Experiment, error) {
-    rows, err := s.Query("SELECT id, name, description, creation_date FROM experiment")
-    if err != nil {
-        return nil, err
-    }
-    defer rows.Close()
+	rows, err := s.Query("SELECT id, name, description, creation_date FROM experiment")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
 
-    result := make(map[int]entity.Experiment)
-    for rows.Next() {
-        var ex entity.Experiment
-        if err := rows.Scan(&ex.ID, &ex.Name, &ex.Description, &ex.CreationDate); err != nil {
-            return nil, err
-        }
-        result[ex.ID] = ex
-    }
+	result := make(map[int]entity.Experiment)
+	for rows.Next() {
+		var ex entity.Experiment
+		if err := rows.Scan(&ex.ID, &ex.Name, &ex.Description, &ex.CreationDate); err != nil {
+			return nil, err
+		}
+		result[ex.ID] = ex
+	}
 
-    return result, nil
+	return result, nil
 }
 
 // Метод для удаления данных об эксперименте по ID.
 func (s *SQLiteExperimentStore) Remove(id int) error {
-    res, err := s.Exec("DELETE FROM experiment WHERE id = ?", id)
-    if err != nil {
-        return err
-    }
-    count, _ := res.RowsAffected()
-    if count == 0 {
-        return repo.NotFoundErr
-    }
-    return nil
+	res, err := s.Exec("DELETE FROM experiment WHERE id = ?", id)
+	if err != nil {
+		return err
+	}
+	count, _ := res.RowsAffected()
+	if count == 0 {
+		return repo.NotFoundErr
+	}
+	return nil
 }
 
 // ExportAllToFile для экспериментов

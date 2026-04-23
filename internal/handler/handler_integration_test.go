@@ -18,7 +18,7 @@ import (
 	"go_rest_crud/internal/repo/sqlite"
 )
 
-// TODO: Переписать тесты нормально. 
+// TODO: Переписать тесты нормально.
 // Сейчас это нейро-слоп. Хотя мб и заработает.
 // Но мне кажется проще тесты самому написать.
 
@@ -36,29 +36,10 @@ type ErrorResponse struct {
 func setupTestDB(t *testing.T) (*sql.DB, *http.ServeMux) {
 	db, err := sql.Open("sqlite", ":memory:")
 	assert.NoError(t, err)
+	_, err = db.Exec("PRAGMA foreign_keys = ON;")
+	assert.NoError(t, err)
 
-	// Создание таблиц (минимальная реализация CreateTables для тестов)
-	_, err = db.Exec(`
-	    CREATE TABLE equipment (
-	        id INTEGER PRIMARY KEY AUTOINCREMENT,
-	        name TEXT NOT NULL,
-	        description TEXT,
-			creation_date TEXT NOT NULL
-	    );
-	    CREATE TABLE experiment (
-	        id INTEGER PRIMARY KEY AUTOINCREMENT,
-	        name TEXT NOT NULL,
-	        description TEXT,
-			creation_date TEXT NOT NULL
-	    );
-	    CREATE TABLE experiment_equipment (
-	        experiment_id INTEGER,
-	        equipment_id INTEGER,
-	        PRIMARY KEY (experiment_id, equipment_id),
-	        FOREIGN KEY (experiment_id) REFERENCES experiment(id) ON DELETE CASCADE,
-	        FOREIGN KEY (equipment_id) REFERENCES equipment(id) ON DELETE CASCADE
-	    );
-	`)
+	err = sqlite.Migrate(db)
 	assert.NoError(t, err)
 
 	// Инициализация хранилищ
@@ -78,15 +59,16 @@ func setupTestDB(t *testing.T) (*sql.DB, *http.ServeMux) {
 	mux := http.NewServeMux()
 
 	mux.Handle("/", &handler.HomeHandler{})
-	
+
 	// Оборудование
 	mux.Handle("/equipment", equipmentHandler)
 	mux.Handle("/equipment/", equipmentHandler) // Для GET/PUT/DELETE /equipment/{id}
 
-	// Эксперименты (и M2M)
-	mux.Handle("/experiments", experimentHandler) // List/Create (хотя /experiments не совпадает с ExperimentRe)
-	mux.Handle("/experiment/", experimentHandler) // Для GET/PUT/DELETE /experiment/{id} и M2M операции
-	
+	mux.Handle("/experiment", experimentHandler)
+	mux.Handle("/experiment/", experimentHandler)
+	mux.Handle("/experiments", experimentHandler)
+	mux.Handle("/experiments/", experimentHandler)
+
 	return db, mux
 }
 
@@ -184,7 +166,7 @@ func TestEquipmentHandlerCRUD_Integration(t *testing.T) {
 		req, _ := http.NewRequest("DELETE", url, nil)
 		rr := executeRequest(mux, req)
 
-		// Ваша реализация Delete в handler_equipment.go возвращает 500, если store.Remove() 
+		// Ваша реализация Delete в handler_equipment.go возвращает 500, если store.Remove()
 		// возвращает ошибку (например, NotFoundErr), что не совсем соответствует RESTful стандартам (204 No Content).
 		// Однако, если удаление успешно, ожидаем 204.
 		assert.Equal(t, http.StatusNoContent, rr.Code)
@@ -259,7 +241,7 @@ func TestExperimentHandlerCRUD_Integration(t *testing.T) {
 		json.Unmarshal(rrEq2.Body.Bytes(), &eq2)
 		eqID2 = eq2.ID
 	})
-	
+
 	// 2. M2M: POST /experiment/{id}/equipment (Add Equipment)
 	t.Run("M2M_AddEquipment_Success", func(t *testing.T) {
 		url := fmt.Sprintf("/experiment/%d/equipment", expID)
@@ -292,7 +274,7 @@ func TestExperimentHandlerCRUD_Integration(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Len(t, list, 2, "Должно быть два прикрепленных оборудования")
 	})
-	
+
 	// 4. M2M: DELETE /experiment/{id}/equipment/{equipment_id} (Remove Equipment)
 	t.Run("M2M_RemoveEquipment_Success", func(t *testing.T) {
 		url := fmt.Sprintf("/experiment/%d/equipment/%d", expID, eqID1)
@@ -328,6 +310,19 @@ func TestExperimentHandlerCRUD_Integration(t *testing.T) {
 		assert.Equal(t, http.StatusOK, rr.Code)
 	})
 
+	t.Run("Experiment_GetEquipment_Success", func(t *testing.T) {
+		url := fmt.Sprintf("/experiment/%d/equipment/%d", expID, eqID2)
+		req, _ := http.NewRequest("GET", url, nil)
+		rr := executeRequest(mux, req)
+
+		assert.Equal(t, http.StatusOK, rr.Code)
+
+		var eq entity.Equipment
+		err := json.Unmarshal(rr.Body.Bytes(), &eq)
+		assert.NoError(t, err)
+		assert.Equal(t, eqID2, eq.ID)
+	})
+
 	t.Run("Experiment_Remove_Success_Cascades", func(t *testing.T) {
 		// Удаляем сам эксперимент
 		deleteURL := fmt.Sprintf("/experiment/%d", expID)
@@ -339,10 +334,29 @@ func TestExperimentHandlerCRUD_Integration(t *testing.T) {
 		reqGet, _ := http.NewRequest("GET", deleteURL, nil)
 		rrGet := executeRequest(mux, reqGet)
 		assert.Equal(t, http.StatusNotFound, rrGet.Code)
-		
-		// NOTE: Каскадное удаление связи (ExperimentEquipment) не проверяется 
+
+		// NOTE: Каскадное удаление связи (ExperimentEquipment) не проверяется
 		// напрямую через API, но оно должно произойти на уровне БД.
 	})
+}
+
+func TestExperimentPluralRoutes_Integration(t *testing.T) {
+	db, mux := setupTestDB(t)
+	defer db.Close()
+
+	payload := readTestData(t, "new_experiment.json")
+	reqCreate, _ := http.NewRequest("POST", "/experiments", bytes.NewBuffer(payload))
+	reqCreate.Header.Set("Content-Type", "application/json")
+	rrCreate := executeRequest(mux, reqCreate)
+	assert.Equal(t, http.StatusCreated, rrCreate.Code)
+
+	var exp entity.Experiment
+	err := json.Unmarshal(rrCreate.Body.Bytes(), &exp)
+	assert.NoError(t, err)
+
+	reqGet, _ := http.NewRequest("GET", fmt.Sprintf("/experiments/%d", exp.ID), nil)
+	rrGet := executeRequest(mux, reqGet)
+	assert.Equal(t, http.StatusOK, rrGet.Code)
 }
 
 func TestMassiveExperimentEquipmentExport_Integration(t *testing.T) {
@@ -354,7 +368,7 @@ func TestMassiveExperimentEquipmentExport_Integration(t *testing.T) {
 	reqExp, _ := http.NewRequest("POST", "/experiment/", bytes.NewBuffer(expPayload))
 	reqExp.Header.Set("Content-Type", "application/json")
 	rrExp := executeRequest(mux, reqExp)
-	
+
 	var exp entity.Experiment
 	json.Unmarshal(rrExp.Body.Bytes(), &exp)
 	expID := exp.ID
@@ -367,7 +381,7 @@ func TestMassiveExperimentEquipmentExport_Integration(t *testing.T) {
 		reqEq, _ := http.NewRequest("POST", "/equipment", bytes.NewBuffer(eqPayload))
 		reqEq.Header.Set("Content-Type", "application/json")
 		rrEq := executeRequest(mux, reqEq)
-		
+
 		var eq entity.Equipment
 		json.Unmarshal(rrEq.Body.Bytes(), &eq)
 
@@ -390,7 +404,7 @@ func TestMassiveExperimentEquipmentExport_Integration(t *testing.T) {
 
 	// 4. Проверяем содержимое файла
 	body := rrExport.Body.String()
-	
+
 	// Проверяем наличие заголовков
 	assert.Contains(t, body, "ID Оборудования")
 	assert.Contains(t, body, "Название")
