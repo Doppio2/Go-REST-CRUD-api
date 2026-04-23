@@ -1,63 +1,154 @@
-# Simple Go REST CRUD API: Equipment Inventory
+# Go REST CRUD: Lab Inventory
 
-## 📝 About the Project
+## Overview
 
-This is an **educational project**—a simple REST API written in **Go (Golang)** designed to manage a small catalog of laboratory equipment.
+This repository contains a small full-stack CRUD application written in Go.
 
-The primary goal of this project is to demonstrate competency in fundamental backend development skills using Go's standard tools:
+The project manages two main entities:
 
-1.  **Full CRUD Implementation:** Create, Read, Update, and Delete operations for the `Equipment` entity.
-2.  **Standard Go HTTP:** Building an HTTP server and request handlers using only the **standard library** (`net/http`).
-3.  **Data Persistence:** Integrating with **SQLite** for basic database storage.
-4.  **Repository Pattern:** Separating data access logic from the handlers for cleaner code structure.
-5.  **RESTful Slugs:** Utilizing URL slugs as unique resource identifiers.
+- `equipment`
+- `experiments`
 
-## ⚙️ Technology Stack
+It also supports a many-to-many relationship between them, so a single experiment can reference multiple equipment items.
 
-* **Language:** Go (Golang)
-* **Database:** SQLite
-* **HTTP/Routing:** Go Standard Library (`net/http`)
-* **Helper Packages:**
-    * `github.com/gosimple/slug`: For generating URL identifiers.
-    * `github.com/stretchr/testify`: For robust testing.
+The application includes:
 
-## 🚀 Getting Started
+- a REST API built with the Go standard library
+- SQLite persistence
+- SQL migrations with `goose`
+- a lightweight embedded frontend written in plain HTML, CSS, and JavaScript
+- CSV export for reports
 
-### Prerequisites
+## Features
 
-* Go (version 1.24+) installed.
+- Create, read, update, and delete equipment
+- Create, read, update, and delete experiments
+- Attach equipment to experiments
+- Remove equipment from experiments
+- Export equipment and experiment data to CSV
+- Export equipment assigned to a specific experiment
+- Light and dark theme toggle in the frontend
 
-### Running the API
+## Tech Stack
+
+- Go
+- `net/http`
+- SQLite
+- `github.com/glebarez/go-sqlite`
+- `github.com/pressly/goose/v3`
+- plain HTML, CSS, and JavaScript
+- `testify` for integration tests
+
+## Project Structure
+
+```text
+cli/
+  api_service/        HTTP entrypoint
+  migrate/            migration CLI
+internal/
+  config/             runtime configuration
+  entity/             domain entities
+  frontend/           embedded frontend assets and handlers
+  handler/            HTTP handlers
+  repo/               repository interfaces
+  repo/sqlite/        SQLite implementation and migrations
+```
+
+## Requirements
+
+- Go 1.24+
+
+## Configuration
+
+Environment variables:
+
+- `APP_PORT` HTTP port, default: `8080`
+- `SQLITE_PATH` SQLite database path, default: `db/go_rest_crud.db`
+- `AUTO_MIGRATE` apply pending migrations on API startup, default: `true`
+
+## Running the App
+
+Start the API server:
 
 ```bash
 go run ./cli/api_service/main.go
 ```
 
-### Database Migrations
+Then open:
 
-Migrations are managed with `goose` and embedded into the Go binaries.
+```text
+http://localhost:8080
+```
 
-Apply all pending migrations:
+## Database Migrations
+
+Apply pending migrations:
 
 ```bash
 go run ./cli/migrate up
 ```
 
-Show migration status:
+Check migration status:
 
 ```bash
 go run ./cli/migrate status
 ```
 
-Roll back the latest migration:
+Rollback the latest migration:
 
 ```bash
 go run ./cli/migrate down
 ```
 
-The SQLite database path defaults to `db/go_rest_crud.db`. Override it with `SQLITE_PATH`.
+## API Notes
 
-Additional runtime configuration:
+Successful JSON responses use this shape:
 
-- `APP_PORT` sets the HTTP port. Default: `8080`
-- `AUTO_MIGRATE` controls whether the API applies pending migrations on startup. Default: `true`
+```json
+{
+  "data": {}
+}
+```
+
+Error responses use this shape:
+
+```json
+{
+  "error": {
+    "code": "validation_error",
+    "message": "name must not be empty"
+  }
+}
+```
+
+`DELETE` endpoints return `204 No Content` on success.
+
+## CSV Export Endpoints
+
+- `GET /equipment?format=csv`
+- `GET /experiments?format=csv`
+- `GET /experiments/{id}/equipment?format=csv`
+
+## Testing
+
+Run all tests:
+
+```bash
+go test ./...
+```
+
+## MVP Status
+
+The current version is suitable as an MVP and portfolio project:
+
+- backend CRUD is implemented
+- persistence and migrations are in place
+- the frontend is functional
+- integration tests cover the main flows
+
+Future improvements could include:
+
+- replacing prompt-based editing with inline forms or a modal
+- streaming CSV directly instead of writing temporary files
+- adding more frontend test coverage
+- refining API validation and domain rules

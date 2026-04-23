@@ -33,12 +33,10 @@ func ValidationErrorHandler(w http.ResponseWriter, message string) {
 	writeJSONError(w, http.StatusBadRequest, "validation_error", message)
 }
 
-// Функция дла обработки ошибки, связанной с некорректной работой сервера.
 func InternalServerErrorHandler(w http.ResponseWriter, r *http.Request) {
 	writeJSONError(w, http.StatusInternalServerError, "internal_error", "internal server error")
 }
 
-// Функция для обработки ошибки
 func NotFoundHandler(w http.ResponseWriter, r *http.Request) {
 	writeJSONError(w, http.StatusNotFound, "not_found", "not found")
 }

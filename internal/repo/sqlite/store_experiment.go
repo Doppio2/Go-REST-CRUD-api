@@ -17,7 +17,6 @@ type SQLiteExperimentStore struct {
 	*sql.DB
 }
 
-// TODO: add the port and it parameters. For now it's only :memory.
 func NewSQLiteExperimentStore(db *sql.DB) *SQLiteExperimentStore {
 	return &SQLiteExperimentStore{
 		db,
@@ -27,7 +26,6 @@ func NewSQLiteExperimentStore(db *sql.DB) *SQLiteExperimentStore {
 func (s *SQLiteExperimentStore) Add(ex entity.Experiment) (int, error) {
 	query := "INSERT INTO experiment (name, description, creation_date) VALUES (?, ?, ?)"
 
-	// Используем res для получения LastInsertID.
 	res, err := s.Exec(query, ex.Name, ex.Description, ex.CreationDate)
 	if err != nil {
 		return 0, err
@@ -38,10 +36,9 @@ func (s *SQLiteExperimentStore) Add(ex entity.Experiment) (int, error) {
 		return 0, err
 	}
 
-	return int(id), nil // Возвращаем ID
+	return int(id), nil
 }
 
-// Метод для получения данных об эксперименте по ID.
 func (s *SQLiteExperimentStore) Get(id int) (entity.Experiment, error) {
 	var ex entity.Experiment
 	err := s.QueryRow("SELECT id, name, description, creation_date FROM experiment WHERE id = ?", id).
@@ -52,7 +49,6 @@ func (s *SQLiteExperimentStore) Get(id int) (entity.Experiment, error) {
 	return ex, err
 }
 
-// Метод для обновления данных об эксперименте.
 func (s *SQLiteExperimentStore) Update(id int, ex entity.Experiment) error {
 	res, err := s.Exec("UPDATE experiment SET name = ?, description = ? WHERE id = ?", ex.Name, ex.Description, id)
 	if err != nil {
@@ -67,7 +63,6 @@ func (s *SQLiteExperimentStore) Update(id int, ex entity.Experiment) error {
 	return nil
 }
 
-// Метод для получения списках всех экспериментов из базы данных.
 func (s *SQLiteExperimentStore) List() (map[int]entity.Experiment, error) {
 	rows, err := s.Query("SELECT id, name, description, creation_date FROM experiment")
 	if err != nil {
@@ -87,7 +82,6 @@ func (s *SQLiteExperimentStore) List() (map[int]entity.Experiment, error) {
 	return result, nil
 }
 
-// Метод для удаления данных об эксперименте по ID.
 func (s *SQLiteExperimentStore) Remove(id int) error {
 	res, err := s.Exec("DELETE FROM experiment WHERE id = ?", id)
 	if err != nil {
@@ -100,41 +94,35 @@ func (s *SQLiteExperimentStore) Remove(id int) error {
 	return nil
 }
 
-// ExportAllToFile для экспериментов
 func (s *SQLiteExperimentStore) ExportAllToFile(filePath string) error {
-	// 1. Получаем данные
 	experimentsMap, err := s.List()
 	if err != nil {
-		return fmt.Errorf("ошибка при получении списка экспериментов: %w", err)
+		return fmt.Errorf("load experiments for export: %w", err)
 	}
 
-	// 2. Создаем файл
 	file, err := os.Create(filePath)
 	if err != nil {
-		return fmt.Errorf("не удалось создать файл: %w", err)
+		return fmt.Errorf("create export file: %w", err)
 	}
 	defer file.Close()
 
-	// Добавляем BOM для корректного отображения кириллицы в Excel
 	file.WriteString("\xEF\xBB\xBF")
 
 	writer := csv.NewWriter(file)
-	writer.Comma = ';' // Точка с запятой для корректного открытия в Excel (RU)
+	writer.Comma = ';'
 	defer writer.Flush()
 
-	// 3. Заголовки таблицы
 	headers := []string{"ID Эксперимента", "Название", "Описание", "Дата проведения"}
 	if err := writer.Write(headers); err != nil {
 		return err
 	}
 
-	// 4. Заполнение данными
 	for _, ex := range experimentsMap {
 		row := []string{
 			strconv.Itoa(ex.ID),
 			ex.Name,
 			ex.Description,
-			ex.CreationDate, // Обычно для экспериментов достаточно даты без времени
+			ex.CreationDate,
 		}
 		if err := writer.Write(row); err != nil {
 			return err

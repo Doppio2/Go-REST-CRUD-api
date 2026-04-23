@@ -1,33 +1,23 @@
 package entity
 
-// Сущность для научного оборудования. Содержит:
-// Уникальный идентификатор.
-// Название оборудования.
-// Описание оборудования.
-// Дата добавления в базу данных.
+// Equipment represents a single lab equipment record.
 type Equipment struct {
-	ID            int     `json:"id"`
-	Name          string  `json:"name"`
-	Description   string  `json:"description"`
-	CreationDate  string  `json:"creation_date"`
+	ID           int    `json:"id"`
+	Name         string `json:"name"`
+	Description  string `json:"description"`
+	CreationDate string `json:"creation_date"`
 }
 
-// Сущность для научного эксперимента. Содержит:
-// Уникальный идентификатор.
-// Название эксперимента.
-// Описание эксперимента.
-// Дата добавления в базу данных.
+// Experiment represents a single experiment record.
 type Experiment struct {
-	ID            int     `json:"id"`
-	Name          string  `json:"name"`
-	Description   string  `json:"description"`
-	CreationDate  string  `json:"creation_date"`      
+	ID           int    `json:"id"`
+	Name         string `json:"name"`
+	Description  string `json:"description"`
+	CreationDate string `json:"creation_date"`
 }
 
-// Сущность для связной таблицы. Содержит:
-// ID эксперимента. Первая часть составного ключа. Внешний ключ.
-// ID научного оборудования. Вторая часть составного ключа. Внешний ключ.
+// ExperimentEquipment represents a link between an experiment and equipment.
 type ExperimentEquipment struct {
-	ExperimentID  int     `json:"experiment_id"`
-	EquipmentID   int     `json:"equipment_id"`
+	ExperimentID int `json:"experiment_id"`
+	EquipmentID  int `json:"equipment_id"`
 }

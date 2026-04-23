@@ -17,41 +17,15 @@ type SQLiteEquipmentStore struct {
 	*sql.DB
 }
 
-// TODO: add the port and it parameters. For now it's only :memory.
 func NewSQLiteEquipmentStore(db *sql.DB) *SQLiteEquipmentStore {
 	return &SQLiteEquipmentStore{
 		db,
 	}
 }
 
-/*
-func (store *SQLiteEquipmentStore) PrintDBSchema() {
-	rows, err := store.Query("PRAGMA table_info(equipment);")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var cid int
-		var name, ctype string
-		var notnull, pk int
-		var dfltValue sql.NullString
-
-		if err := rows.Scan(&cid, &name, &ctype, &notnull, &dfltValue, &pk); err != nil {
-			log.Fatal(err)
-		}
-
-		fmt.Printf("Column: %s, Type: %s, NotNull: %d, Default: %v, PK: %d\n",
-		name, ctype, notnull, dfltValue, pk)
-	}
-}
-*/
-
 func (s *SQLiteEquipmentStore) Add(e entity.Equipment) (int, error) {
 	query := "INSERT INTO equipment (name, description, creation_date) VALUES (?, ?, ?)"
 
-	// Используем res для получения LastInsertID.
 	res, err := s.Exec(query, e.Name, e.Description, e.CreationDate)
 	if err != nil {
 		return 0, err
@@ -62,10 +36,9 @@ func (s *SQLiteEquipmentStore) Add(e entity.Equipment) (int, error) {
 		return 0, err
 	}
 
-	return int(id), nil // Возвращаем ID
+	return int(id), nil
 }
 
-// Стоит ли назвать функцию GetById, а не просто Get???? Не знаю пока. Если других фукнция не планируется, мб и не стоит.
 func (s *SQLiteEquipmentStore) Get(id int) (entity.Equipment, error) {
 	var e entity.Equipment
 	rows := s.QueryRow("SELECT id, name, description, creation_date FROM equipment WHERE id = ?", id)
@@ -91,7 +64,6 @@ func (s *SQLiteEquipmentStore) Update(id int, e entity.Equipment) error {
 }
 
 func (s *SQLiteEquipmentStore) List() (map[int]entity.Equipment, error) {
-
 	rows, err := s.Query("SELECT id, name, description, creation_date FROM equipment")
 	if err != nil {
 		return nil, err
@@ -123,43 +95,37 @@ func (s *SQLiteEquipmentStore) Remove(id int) error {
 }
 
 func (s *SQLiteEquipmentStore) ExportAllToFile(filePath string) error {
-	// 1. Получаем данные через наш существующий метод List
 	equipmentMap, err := s.List()
 	if err != nil {
-		return fmt.Errorf("ошибка при получении данных: %v", err)
+		return fmt.Errorf("load equipment for export: %w", err)
 	}
 
-	// 2. Создаем файл
 	file, err := os.Create(filePath)
 	if err != nil {
-		return fmt.Errorf("не удалось создать файл: %v", err)
+		return fmt.Errorf("create export file: %w", err)
 	}
 	defer file.Close()
 
-	// Добавляем BOM (Byte Order Mark) для корректного отображения кириллицы в Excel
 	file.WriteString("\xEF\xBB\xBF")
 
 	writer := csv.NewWriter(file)
-	// Устанавливаем точку с запятой как разделитель (стандарт для Excel в RU регионе)
 	writer.Comma = ';'
 	defer writer.Flush()
 
-	// 3. Записываем "шапку" таблицы
 	headers := []string{"ID", "Название", "Описание", "Дата создания"}
 	if err := writer.Write(headers); err != nil {
-		return fmt.Errorf("ошибка записи заголовков: %v", err)
+		return fmt.Errorf("write CSV header: %w", err)
 	}
 
-	// 4. Проходим по мапе и записываем строки
 	for _, e := range equipmentMap {
 		row := []string{
 			strconv.Itoa(e.ID),
 			e.Name,
 			e.Description,
-			e.CreationDate, // Удобный формат даты
+			e.CreationDate,
 		}
 		if err := writer.Write(row); err != nil {
-			return fmt.Errorf("ошибка записи строки ID %d: %v", e.ID, err)
+			return fmt.Errorf("write CSV row for equipment %d: %w", e.ID, err)
 		}
 	}
 
